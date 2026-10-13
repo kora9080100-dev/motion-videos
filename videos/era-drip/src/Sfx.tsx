@@ -1,20 +1,35 @@
 import React from 'react';
 import {Audio, Sequence, staticFile} from 'remotion';
-import {SEGMENTS, TRIPTYCH} from './Montage';
+import {SHOTS, TRANSITIONS, Tr, WORDS} from './Montage';
 import {T} from './theme';
 
 type Cue = {at: number; file: string; volume?: number; dur?: number};
 
+const TRANSITION_SFX: Record<Tr, {file: string; volume: number; lead: number} | null> = {
+	flash: {file: 'impact.wav', volume: 0.55, lead: 0},
+	whipUp: {file: 'whip.wav', volume: 0.6, lead: 3},
+	whipDown: {file: 'whip.wav', volume: 0.6, lead: 3},
+	whipL: {file: 'whip.wav', volume: 0.6, lead: 3},
+	whipR: {file: 'whip.wav', volume: 0.6, lead: 3},
+	zoom: {file: 'whoosh.wav', volume: 0.6, lead: 7},
+	spin: {file: 'whoosh.wav', volume: 0.55, lead: 6},
+	glitch: {file: 'glitch.wav', volume: 0.55, lead: 1},
+	flip: {file: 'whip.wav', volume: 0.55, lead: 3},
+	line: {file: 'whoosh.wav', volume: 0.5, lead: 8},
+	iris: {file: 'whoosh.wav', volume: 0.5, lead: 10},
+	push: {file: 'whoosh.wav', volume: 0.5, lead: 8},
+	cut: null,
+};
+
 const montageCues = (): Cue[] => {
-	const cues: Cue[] = [];
-	const cuts = [...SEGMENTS.map((s) => ({from: s.from, fx: s.fx})), {from: TRIPTYCH.from, fx: 'triptych'}];
-	for (const c of cuts) {
-		if (c.from === T.montage) continue;
-		if (c.fx === 'glitch') cues.push({at: c.from, file: 'glitch.wav', volume: 0.55});
-		else if (c.fx === 'toWhite') continue;
-		else cues.push({at: c.from, file: 'whip.wav', volume: 0.45});
-	}
-	for (const at of [T.montage, TRIPTYCH.from, 657, 773, 876, 913]) cues.push({at, file: 'hit.wav', volume: 0.8});
+	const cues: Cue[] = [{at: T.montage, file: 'hit.wav', volume: 0.85}, {at: T.montage + 5, file: 'typing.wav', volume: 0.35, dur: 18}];
+	TRANSITIONS.forEach((tr, i) => {
+		const sfx = TRANSITION_SFX[tr];
+		const at = SHOTS[i + 1].from;
+		if (sfx) cues.push({at: at - sfx.lead, file: sfx.file, volume: sfx.volume});
+		cues.push({at, file: 'hit.wav', volume: 0.55});
+	});
+	for (const w of WORDS) cues.push({at: w.from, file: 'impact.wav', volume: 0.45});
 	return cues;
 };
 

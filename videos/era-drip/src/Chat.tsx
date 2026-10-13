@@ -29,8 +29,8 @@ const MSGS: Msg[] = [
 	{id: 'photo', side: 'out', y: 572, appear: 34, kind: 'photo'},
 	{id: 'think', side: 'out', y: 1162, appear: 60, kind: 'text', text: 'وش رايك فيه؟؟'},
 	{id: 'typing', side: 'in', y: 1310, appear: 172, hide: 266, kind: 'typing'},
-	{id: 'but', side: 'in', y: 1310, appear: 267, kind: 'text', text: 'حلو بس...'},
-	{id: 'fire', side: 'in', y: 1446, appear: T.reply + 4, kind: 'text', text: 'ليش مبالغين كذا؟! 🔥🔥', strong: true},
+	{id: 'but', side: 'in', y: 1310, appear: 267, kind: 'text', text: 'حلو بس.....'},
+	{id: 'fire', side: 'in', y: 1446, appear: T.reply + 4, kind: 'text', text: 'رهيب 🔥🔥', strong: true},
 ];
 
 const READ_AT = 165;
@@ -67,7 +67,7 @@ const camFollow = (f: number): Cam => {
 	};
 };
 
-// Scene 2: wide shot, then a slow tension push toward "حلو بس..."
+// Scene 2: wide shot, then a slow tension push toward "حلو بس....."
 const camWide = (f: number): Cam => ({
 	cx: interpolate(f, [T.chatWide, 268, 376], [540, 535, 470], {easing: ease, extrapolateRight: 'clamp'}),
 	cy: interpolate(f, [T.chatWide, 268, 376], [900, 930, 1080], {easing: ease, extrapolateRight: 'clamp'}),
@@ -80,9 +80,9 @@ const camWide = (f: number): Cam => ({
 
 // Scene 3: close-up on the reply
 const camReply = (f: number): Cam => ({
-	cx: interpolate(f, [T.reply, 492], [368, 362], {extrapolateRight: 'clamp'}),
-	cy: interpolate(f, [T.reply, 492], [1440, 1455], {extrapolateRight: 'clamp'}),
-	s: interpolate(f, [T.reply, 492], [1.45, 1.6], {easing: Easing.out(Easing.quad), extrapolateRight: 'clamp'}),
+	cx: interpolate(f, [T.reply, 492], [262, 250], {extrapolateRight: 'clamp'}),
+	cy: interpolate(f, [T.reply, 492], [1430, 1450], {extrapolateRight: 'clamp'}),
+	s: interpolate(f, [T.reply, 492], [1.85, 2.05], {easing: Easing.out(Easing.quad), extrapolateRight: 'clamp'}),
 	rx: interpolate(f, [T.reply, 492], [5, 2]),
 	ry: interpolate(f, [T.reply, 492], [5, 1]),
 	rz: interpolate(f, [T.reply, 492], [1.5, -1.5]),
@@ -104,7 +104,7 @@ const camera = (f: number): Cam => {
 	// Zoom-through into the 🔥 emojis
 	const t = Easing.in(Easing.quad)(interpolate(f, [486, T.montage], [0, 1], {extrapolateRight: 'clamp'}));
 	const base = camReply(486);
-	return {...base, cx: lerp(base.cx, 140, t), cy: lerp(base.cy, 1488, t), s: Math.exp(lerp(Math.log(base.s), Math.log(14), t)), blur: t * 22};
+	return {...base, cx: lerp(base.cx, 150, t), cy: lerp(base.cy, 1500, t), s: Math.exp(lerp(Math.log(base.s), Math.log(14), t)), blur: t * 22};
 };
 
 const Ticks: React.FC<{read: boolean}> = ({read}) => (
@@ -168,7 +168,7 @@ const Bubble: React.FC<{m: Msg; frame: number; fps: number}> = ({m, frame, fps})
 
 	const textStyle: React.CSSProperties = {
 		fontFamily: ARABIC_FONT,
-		fontSize: m.strong ? 50 : 46,
+		fontSize: m.strong ? 60 : 46,
 		fontWeight: m.strong ? 800 : 700,
 		color: C.text,
 		direction: 'rtl',
