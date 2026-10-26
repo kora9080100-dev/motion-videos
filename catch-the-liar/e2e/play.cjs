@@ -25,6 +25,8 @@ async function shot(page, name) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert(overflow <= 0, `${name}: no sideways scrolling (overflow ${overflow}px)`);
   await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: true });
+  fs.mkdirSync(path.join(SHOTS, 'screen'), { recursive: true });
+  await page.screenshot({ path: path.join(SHOTS, 'screen', `${name}.png`) });
 }
 
 (async () => {
