@@ -78,6 +78,7 @@ export class RoomManager {
       players: s.players.length,
       phase: s.phase,
       full: s.players.length >= 10,
+      locked: !!s.locked,
       hostName: room.getPlayer(s.hostId)?.nickname,
     };
   }

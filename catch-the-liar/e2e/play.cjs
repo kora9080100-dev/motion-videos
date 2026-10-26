@@ -197,6 +197,15 @@ async function shot(page, name) {
   assert(true, 'a mid-round joiner becomes a spectator');
   await shot(deskPage, '15-spectator-desktop');
 
+  console.log('11) Host locks the room');
+  await host.getByRole('button', { name: 'مشاركة الغرفة' }).click();
+  await host.getByTestId('lock-room').click(); // state comes back from the server
+  await host.getByText('الغرفة مقفلة', { exact: false }).first().waitFor();
+  const outsider = await (await browser.newContext({ ...phone, locale: 'ar-SA' })).newPage();
+  await outsider.goto(`${BASE}/r/${code}`);
+  await outsider.getByTestId('room-locked').waitFor();
+  assert(true, 'a stranger cannot join a locked room');
+
   await browser.close();
   console.log('\nE2E passed ✅');
 })().catch((err) => {

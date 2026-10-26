@@ -69,7 +69,7 @@ function RoomScreen({ view, connected }: { view: RoomView; connected: boolean })
         <button className="room-code-chip" onClick={() => setShareOpen(true)} aria-label="مشاركة الغرفة">
           <span className="small dim label-word">غرفة</span>
           <span className="digits ltr">{view.code}</span>
-          <span aria-hidden="true">📤</span>
+          <span aria-hidden="true">{view.locked ? '🔒' : '📤'}</span>
         </button>
         <span className="spacer" />
         {view.roundNumber > 0 && <span className="round-pill">الجولة {view.roundNumber}</span>}
@@ -98,7 +98,7 @@ function RoomScreen({ view, connected }: { view: RoomView; connected: boolean })
         </aside>
       </div>
 
-      <ShareSheet code={view.code} open={shareOpen} onClose={() => setShareOpen(false)} />
+      <ShareSheet view={view} open={shareOpen} onClose={() => setShareOpen(false)} />
       <Sheet open={scoresOpen} onClose={() => setScoresOpen(false)} title="🏆 لوحة النقاط">
         <Scoreboard view={view} />
       </Sheet>
@@ -244,6 +244,10 @@ function JoinRoom({ code }: { code: string }) {
 
         {preview?.full ? (
           <p className="center field-error">الغرفة مليانة (١٠ لاعبين) 😕</p>
+        ) : preview?.locked ? (
+          <p className="center field-error" data-testid="room-locked">
+            الغرفة مقفلة 🔒 اطلب من المضيف يفتحها عشان تدخل
+          </p>
         ) : (
           <form className="stack" onSubmit={join}>
             <div className="field">

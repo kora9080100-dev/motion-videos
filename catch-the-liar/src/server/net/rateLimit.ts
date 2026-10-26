@@ -21,6 +21,12 @@ export class WindowLimiter {
     return entry.count <= this.limit;
   }
 
+  /** True when the key already used up its allowance in the current window (no counting). */
+  blocked(key: string): boolean {
+    const entry = this.hits.get(key);
+    return !!entry && entry.resetAt > this.now() && entry.count >= this.limit;
+  }
+
   private sweep(t: number): void {
     if (this.hits.size < 5000) return;
     for (const [k, v] of this.hits) if (v.resetAt <= t) this.hits.delete(k);

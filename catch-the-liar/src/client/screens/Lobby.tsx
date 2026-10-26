@@ -44,7 +44,7 @@ export function Lobby({ view }: { view: RoomView }) {
         subtitle={host ? 'شارك الرابط مع ربعك، وإذا اكتملتوا ابدأ الجولة' : `أهلاً فيك! ننتظر ${hostName(view)} يبدأ الجولة`}
       />
 
-      <InviteCard code={view.code} />
+      <InviteCard code={view.code} view={view} />
 
       <section className="card" aria-label="اللاعبين">
         <div className="card-title">

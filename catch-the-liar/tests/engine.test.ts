@@ -50,6 +50,31 @@ describe('room membership', () => {
   });
 });
 
+describe('room protection', () => {
+  it('only the host can lock; a locked room refuses new players', () => {
+    const { room, ids } = roomWith(3);
+    expect(room.setLocked(ids[1]!, true).ok).toBe(false);
+    expect(room.setLocked(ids[0]!, true).ok).toBe(true);
+    expect(room.viewFor(ids[1]!, T0).locked).toBe(true);
+    expect(room.addPlayer({ id: 'new', nickname: 'جديد', tokenHash: 'h', now: T0 })).toMatchObject({ ok: false });
+    // Existing players can still drop and come back.
+    room.setConnected(ids[2]!, false, T0);
+    room.setConnected(ids[2]!, true, T0 + 1000);
+    expect(room.getPlayer(ids[2]!)!.connected).toBe(true);
+    room.setLocked(ids[0]!, false);
+    expect(room.addPlayer({ id: 'new', nickname: 'جديد', tokenHash: 'h', now: T0 }).ok).toBe(true);
+  });
+
+  it('rejects offensive nicknames and hints', () => {
+    const { room, ids } = roomWith(3);
+    expect(room.addPlayer({ id: 'bad', nickname: 'شرموط', tokenHash: 'h', now: T0 })).toMatchObject({ ok: false });
+    startToHints(room, ids);
+    const res = room.submitHint(currentTurn(room), 'fuck', T0);
+    expect(res).toMatchObject({ ok: false });
+    expect(room.state.round!.hints).toHaveLength(0);
+  });
+});
+
 describe('starting a round', () => {
   it('needs the host and at least 3 connected players', () => {
     const { room, ids } = roomWith(3);

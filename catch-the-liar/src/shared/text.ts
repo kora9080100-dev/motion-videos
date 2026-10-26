@@ -2,7 +2,7 @@ import { NICKNAME_MAX, NICKNAME_MIN, ROOM_CODE_LENGTH } from './types';
 
 // Control characters, zero-width characters and bidi overrides that could be used to
 // spoof names or break the layout.
-const UNSAFE_CHARS = /[\u0000-\u001F\u007F-\u009F​-‏‪-‮⁠-⁩﻿]/g;
+const UNSAFE_CHARS = /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g;
 
 /** Trims, collapses whitespace, strips unsafe characters and caps length by code point. */
 export function cleanText(input: unknown, maxLen: number): string {
@@ -50,7 +50,7 @@ export function isValidRoomCode(code: string): boolean {
 export function normalizeForCompare(input: string): string {
   return input
     .normalize('NFC')
-    .replace(/[ً-ٰٟـ]/g, '')
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
     .replace(/[أإآٱ]/g, 'ا')
     .replace(/ى/g, 'ي')
     .replace(/ة/g, 'ه')

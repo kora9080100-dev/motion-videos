@@ -9,6 +9,8 @@ export interface RoomState {
   hostId: string;
   players: PlayerState[];
   bannedTokenHashes: string[];
+  /** Host closed the room to new players. Optional for snapshots saved before it existed. */
+  locked?: boolean;
   settings: RoomSettings;
   phase: Phase;
   phaseEndsAt: number | null;

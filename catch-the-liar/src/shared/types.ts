@@ -135,6 +135,8 @@ export interface RoomView {
   myVote: string | null;
   guess: { liarId: string; options: string[] | null; liarName: string } | null;
   result: RoundResultView | null;
+  /** Host locked the room: no new players can join (existing ones can still reconnect). */
+  locked: boolean;
   features: RoomFeatures;
 }
 
@@ -161,6 +163,7 @@ export interface ClientToServerEvents {
   /** Stop receiving updates for the room without leaving it (e.g. went back to home). */
   'room:detach': (p: Record<string, never>, ack: Ack) => void;
   'room:kick': (p: { playerId: string }, ack: Ack) => void;
+  'room:lock': (p: { locked: boolean }, ack: Ack) => void;
   'room:settings': (p: Partial<RoomSettings>, ack: Ack) => void;
   'room:lobby': (p: Record<string, never>, ack: Ack) => void;
   'scores:reset': (p: Record<string, never>, ack: Ack) => void;
@@ -186,6 +189,7 @@ export interface RoomPreview {
   players?: number;
   phase?: Phase;
   full?: boolean;
+  locked?: boolean;
   hostName?: string;
 }
 

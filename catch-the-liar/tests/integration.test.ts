@@ -222,6 +222,23 @@ describe('realtime server', () => {
     expect(await res.json()).toEqual({ exists: false });
   });
 
+  it('a locked room refuses newcomers but lets members reconnect', async () => {
+    const host = new Player('قفل');
+    const code = await host.create();
+    const member = new Player('عضو');
+    await member.join(code);
+    await until(() => host.view?.players.length === 2);
+    expect((await member.emit('room:lock', { locked: true })).ok).toBe(false);
+    expect((await host.emit('room:lock', { locked: true })).ok).toBe(true);
+    await until(() => member.view?.locked === true, 'lock broadcast');
+    expect((await fetch(`${url}/api/rooms/${code}`).then((r) => r.json())).locked).toBe(true);
+    const stranger = new Player('غريب');
+    expect(await stranger.join(code)).toMatchObject({ ok: false });
+    member.socket.disconnect();
+    const back = new Player('عضو');
+    expect((await back.emit('room:resume', member.session!)).ok).toBe(true);
+  });
+
   it('restores rooms from snapshots after a restart', async () => {
     const host = new Player('سلطان');
     const code = await host.create();
@@ -237,4 +254,15 @@ describe('realtime server', () => {
     expect(snap.phase).toBe('reveal');
     expect(snap.round!.word).toBeTruthy();
   });
+  it('blocks an IP that keeps guessing wrong room codes', async () => {
+    const host = new Player('حارس');
+    const code = await host.create();
+    for (let i = 0; i < 20; i++) await fetch(`${url}/api/rooms/${100000 + i}`);
+    expect((await fetch(`${url}/api/rooms/${code}`)).status).toBe(429);
+    const guesser = new Player('مخمن');
+    const res = await guesser.join(code);
+    expect(res).toMatchObject({ ok: false });
+    expect((res as { error: string }).error).toContain('رموز غلط');
+  });
+
 });

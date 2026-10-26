@@ -11,7 +11,7 @@ import type { GameRepository } from './db/repository';
 import type { RoomDeps } from './game/room';
 import type { Catalog } from './game/types';
 import { resolveFeatures } from './monetization';
-import { registerHandlers } from './net/handlers';
+import { registerHandlers, type Guards } from './net/handlers';
 import { RoomManager, type GameServer } from './net/manager';
 import { Persistence } from './net/persistence';
 import { WindowLimiter, clientIp } from './net/rateLimit';
@@ -43,6 +43,8 @@ export function createGameServer(opts: {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     res.setHeader(
       'Content-Security-Policy',
       [
@@ -81,8 +83,20 @@ export function createGameServer(opts: {
       cb('origin not allowed', false);
     },
   });
+  // Cap simultaneous connections per IP (a whole family on one Wi-Fi stays far below this).
+  const MAX_CONNECTIONS_PER_IP = 30;
+  const connectionsPerIp = new Map<string, number>();
   io.use((socket, next) => {
-    socket.data.ip = clientIp(socket.handshake.headers, socket.handshake.address, config.trustProxy);
+    const ip = clientIp(socket.handshake.headers, socket.handshake.address, config.trustProxy);
+    const count = connectionsPerIp.get(ip) ?? 0;
+    if (count >= MAX_CONNECTIONS_PER_IP) return next(new Error('too many connections'));
+    connectionsPerIp.set(ip, count + 1);
+    socket.once('disconnect', () => {
+      const n = (connectionsPerIp.get(ip) ?? 1) - 1;
+      if (n <= 0) connectionsPerIp.delete(ip);
+      else connectionsPerIp.set(ip, n);
+    });
+    socket.data.ip = ip;
     next();
   });
 
@@ -94,7 +108,8 @@ export function createGameServer(opts: {
   };
   const persistence = new Persistence(repo);
   const manager = new RoomManager(io, deps, persistence);
-  registerHandlers(io, manager, randomUUID);
+  const guards: Guards = { badCodes: new WindowLimiter(20, 10 * 60_000) };
+  registerHandlers(io, manager, randomUUID, guards);
 
   // ------------------------------------------------------------- HTTP API
   const previewLimiter = new WindowLimiter(60, 60_000);
@@ -115,12 +130,15 @@ export function createGameServer(opts: {
   });
 
   app.get('/api/rooms/:code', (req: Request<{ code: string }>, res: Response) => {
-    if (!previewLimiter.hit(clientIp(req.headers, req.socket.remoteAddress, config.trustProxy))) {
+    const ip = clientIp(req.headers, req.socket.remoteAddress, config.trustProxy);
+    if (!previewLimiter.hit(ip) || guards.badCodes.blocked(ip)) {
       res.status(429).json({ exists: false });
       return;
     }
+    const preview = manager.preview(normalizeRoomCode(req.params.code));
+    if (!preview.exists) guards.badCodes.hit(ip);
     res.setHeader('Cache-Control', 'no-store');
-    res.json(manager.preview(normalizeRoomCode(req.params.code)));
+    res.json(preview);
   });
 
   app.use('/api', (_req, res) => {

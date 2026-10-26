@@ -1,9 +1,49 @@
 import { useEffect, useState } from 'react';
+import type { RoomView } from '../../shared/types';
 import { roomUrl } from '../lib/router';
 import { canNativeShare, copyRoomLink, nativeShare, qrDataUrl, whatsappLink } from '../lib/share';
+import { game } from '../lib/store';
+import { toast } from '../lib/toasts';
+import { isHost } from '../lib/view';
 import { Button, Sheet } from './ui';
 
-export function InviteCard({ code }: { code: string }) {
+/** Host switch to stop new players from joining; everyone else just sees the status. */
+export function LockControl({ view }: { view: RoomView }) {
+  const [busy, setBusy] = useState(false);
+  if (!isHost(view)) {
+    return view.locked ? (
+      <p className="center small" style={{ fontWeight: 800, color: 'var(--orange-2)' }}>
+        🔒 المضيف قفل الغرفة، ما أحد جديد يقدر يدخل
+      </p>
+    ) : null;
+  }
+  async function toggle(locked: boolean) {
+    setBusy(true);
+    const res = await game.send('room:lock', { locked });
+    setBusy(false);
+    if (!res.ok) toast(res.error, 'error');
+  }
+  return (
+    <label className="toggle lock-toggle">
+      <input
+        type="checkbox"
+        checked={view.locked}
+        disabled={busy}
+        onChange={(e) => void toggle(e.target.checked)}
+        data-testid="lock-room"
+      />
+      <span>
+        <b>{view.locked ? '🔒 الغرفة مقفلة' : '🔓 قفل الغرفة'}</b>
+        <br />
+        <span className="small muted">
+          {view.locked ? 'ما أحد جديد يقدر يدخل. اللاعبين الموجودين يرجعون عادي لو انقطعوا' : 'إذا اكتملتوا اقفلها عشان ما يدخل أحد غريب'}
+        </span>
+      </span>
+    </label>
+  );
+}
+
+export function InviteCard({ code, view }: { code: string; view: RoomView }) {
   const [qrOpen, setQrOpen] = useState(false);
   return (
     <section className="card stack" aria-label="دعوة الأصدقاء">
@@ -36,15 +76,18 @@ export function InviteCard({ code }: { code: string }) {
           🔳 رمز QR
         </Button>
       </div>
+      <LockControl view={view} />
       <QrSheet code={code} open={qrOpen} onClose={() => setQrOpen(false)} />
     </section>
   );
 }
 
-export function ShareSheet({ code, open, onClose }: { code: string; open: boolean; onClose: () => void }) {
+export function ShareSheet({ view, open, onClose }: { view: RoomView; open: boolean; onClose: () => void }) {
+  const code = view.code;
   return (
     <Sheet open={open} onClose={onClose} title="ادعُ أصدقاءك">
       <div className="stack">
+        <LockControl view={view} />
         <QrImage code={code} />
         <div className="share-grid">
           {canNativeShare() && (

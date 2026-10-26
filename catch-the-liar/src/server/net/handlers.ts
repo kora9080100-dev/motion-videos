@@ -10,12 +10,18 @@ import { TokenBucket, WindowLimiter } from './rateLimit';
 const createLimiter = new WindowLimiter(10, 60_000);
 const joinLimiter = new WindowLimiter(40, 60_000);
 
+export interface Guards {
+  /** Wrong room codes per IP: stops people guessing their way into strangers' rooms. */
+  badCodes: WindowLimiter;
+}
+
 const empty = z.object({}).passthrough();
 const schemas = {
   create: z.object({ nickname: z.string().max(100) }),
   join: z.object({ code: z.string().max(20), nickname: z.string().max(100) }),
   resume: z.object({ code: z.string().max(20), playerId: z.string().uuid(), token: z.string().min(20).max(100) }),
   kick: z.object({ playerId: z.string().uuid() }),
+  lock: z.object({ locked: z.boolean() }),
   settings: z
     .object({
       packIds: z.array(z.string().max(40)).max(50),
@@ -48,9 +54,10 @@ const MSG = {
   badCode: 'رمز الغرفة لازم يكون 6 أرقام',
   banned: 'تم إخراجك من هذي الغرفة',
   sessionGone: 'ما لقينا جلستك في الغرفة، ادخل باسمك من جديد',
+  tooManyCodes: 'جربت رموز غلط كثير 🚫 انتظر ١٠ دقائق أو اطلب الرابط من صاحبك',
 } as const;
 
-export function registerHandlers(io: GameServer, manager: RoomManager, newId: () => string): void {
+export function registerHandlers(io: GameServer, manager: RoomManager, newId: () => string, guards: Guards): void {
   io.on('connection', (socket: GameSocket) => {
     const bucket = new TokenBucket(20, 8);
 
@@ -110,10 +117,14 @@ export function registerHandlers(io: GameServer, manager: RoomManager, newId: ()
 
     on('room:join', schemas.join, (p, ack) => {
       if (!joinLimiter.hit(socket.data.ip)) return ack({ ok: false, error: MSG.slowDown });
+      if (guards.badCodes.blocked(socket.data.ip)) return ack({ ok: false, error: MSG.tooManyCodes });
       const code = normalizeRoomCode(p.code);
       if (!isValidRoomCode(code)) return ack({ ok: false, error: MSG.badCode });
       const room = manager.get(code);
-      if (!room || room.closed) return ack({ ok: false, error: MSG.noRoom });
+      if (!room || room.closed) {
+        guards.badCodes.hit(socket.data.ip);
+        return ack({ ok: false, error: MSG.noRoom });
+      }
       newSession(room, p.nickname, ack);
     });
 
@@ -145,6 +156,7 @@ export function registerHandlers(io: GameServer, manager: RoomManager, newId: ()
     });
 
     act('room:kick', schemas.kick, (room, by, p: { playerId: string }, now) => room.kick(by, p.playerId, now));
+    act('room:lock', schemas.lock, (room, by, p: { locked: boolean }) => room.setLocked(by, p.locked));
     act('room:settings', schemas.settings, (room, by, p: z.infer<typeof schemas.settings>) =>
       room.updateSettings(by, p as never),
     );

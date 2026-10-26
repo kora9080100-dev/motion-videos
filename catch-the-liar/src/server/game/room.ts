@@ -17,6 +17,7 @@ import {
   type SecretView,
 } from '../../shared/types';
 import { cleanText, hintRevealsWord, validateNickname } from '../../shared/text';
+import { isOffensive } from '../moderation';
 import {
   AVATAR_COUNT,
   GUESS_MS,
@@ -81,6 +82,7 @@ export class GameRoom {
         hostId: '',
         players: [],
         bannedTokenHashes: [],
+        locked: false,
         settings: { ...DEFAULT_SETTINGS },
         phase: 'lobby',
         phaseEndsAt: null,
@@ -144,9 +146,11 @@ export class GameRoom {
   addPlayer(input: { id: string; nickname: string; tokenHash: string; now: number }): OpResult {
     const s = this.state;
     if (s.closed) return fail(ERR.closed);
+    if (s.locked) return fail('الغرفة مقفلة 🔒 اطلب من المضيف يفتحها');
     if (s.players.length >= MAX_PLAYERS) return fail(`الغرفة مليانة، الحد الأقصى ${MAX_PLAYERS} لاعبين`);
     const name = validateNickname(input.nickname);
     if (!name.ok) return name;
+    if (isOffensive(name.value)) return fail('الاسم فيه كلمة غير لائقة، اختر اسم ثاني 🙏');
     const key = nameKey(name.value);
     if (s.players.some((p) => nameKey(p.nickname) === key)) return fail('هذا الاسم مستخدم في الغرفة، اختر اسم ثاني');
 
@@ -256,6 +260,20 @@ export class GameRoom {
   }
 
   // ---------------------------------------------------------------- host controls
+
+  setLocked(byId: string, locked: boolean): OpResult {
+    const s = this.state;
+    if (!this.isHost(byId)) return fail(ERR.notHost);
+    if (!!s.locked === locked) return OK;
+    s.locked = locked;
+    this.emit({
+      type: 'notice',
+      text: locked ? '🔒 المضيف قفل الغرفة، ما أحد جديد يقدر يدخل' : '🔓 المضيف فتح الغرفة',
+      kind: 'info',
+    });
+    this.touch();
+    return OK;
+  }
 
   updateSettings(byId: string, patch: Partial<RoomSettings>): OpResult {
     const s = this.state;
@@ -400,6 +418,7 @@ export class GameRoom {
     if (!slot || slot.playerId !== byId) return fail('مو دورك الحين');
     const clean = cleanText(text, HINT_MAX);
     if (!clean) return fail('اكتب تلميح أول');
+    if (isOffensive(clean)) return fail('التلميح فيه كلمة غير لائقة 🙏 جرّب غيره');
     if (byId !== r.liarId && hintRevealsWord(clean, r.word)) {
       return fail('لا تكتب الكلمة نفسها 😅 جرّب تلميح ثاني');
     }
@@ -752,6 +771,7 @@ export class GameRoom {
           ? { liarId: r.liarId, liarName: r.liarName, options: playerId === r.liarId ? r.guessOptions : null }
           : null,
       result: s.phase === 'results' && r ? r.result : null,
+      locked: !!s.locked,
       features: this.deps.features?.(s) ?? { tier: 'free', adsEnabled: false },
     };
   }
@@ -772,7 +792,7 @@ export class GameRoom {
 }
 
 function nameKey(name: string): string {
-  return name.toLowerCase().replace(/[ً-ٰٟـ]/g, '').replace(/\s+/g, ' ');
+  return name.toLowerCase().replace(/[\u064B-\u065F\u0670\u0640]/g, '').replace(/\s+/g, ' ');
 }
 
 export function shuffle<T>(items: readonly T[], rng: Rng): T[] {
