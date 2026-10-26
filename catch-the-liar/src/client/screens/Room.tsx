@@ -67,7 +67,7 @@ function RoomScreen({ view, connected }: { view: RoomView; connected: boolean })
           🚪
         </button>
         <button className="room-code-chip" onClick={() => setShareOpen(true)} aria-label="مشاركة الغرفة">
-          <span className="small dim">غرفة</span>
+          <span className="small dim label-word">غرفة</span>
           <span className="digits ltr">{view.code}</span>
           <span aria-hidden="true">📤</span>
         </button>

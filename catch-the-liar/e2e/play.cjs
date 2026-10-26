@@ -10,7 +10,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
-const SHOTS = path.join(__dirname, 'screenshots');
+const DEVICE = process.env.DEVICE || 'iPhone 13';
+const SHOTS = path.join(__dirname, 'screenshots', DEVICE.replace(/\W+/g, '-').toLowerCase());
 const NAMES = ['سارة', 'خالد', 'نورة', 'فهد'];
 fs.mkdirSync(SHOTS, { recursive: true });
 
@@ -21,12 +22,15 @@ function assert(cond, msg) {
 
 async function shot(page, name) {
   await page.waitForTimeout(700); // let entrance animations settle
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  assert(overflow <= 0, `${name}: no sideways scrolling (overflow ${overflow}px)`);
   await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: true });
 }
 
 (async () => {
   const browser = await chromium.launch();
-  const phone = devices['iPhone 13'];
+  const phone = devices[DEVICE];
+  if (!phone) throw new Error(`unknown DEVICE ${DEVICE}`);
   const contexts = [];
   const pages = [];
   for (let i = 0; i < NAMES.length; i++) {

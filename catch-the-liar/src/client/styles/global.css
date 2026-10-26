@@ -663,11 +663,21 @@ a {
   flex: 1;
 }
 
+.player-chip {
+  position: relative;
+}
+
+.player-chip:has(.kick) {
+  padding-inline-end: 36px;
+}
+
 .player-chip .kick {
-  flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
   border: 1px solid rgba(251, 113, 133, 0.35);
   background: rgba(251, 113, 133, 0.1);
   color: var(--red);
@@ -709,8 +719,27 @@ a {
 .room-top {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 12px;
+  min-width: 0;
+}
+
+@media (max-width: 400px) {
+  .room-top .icon-btn {
+    width: 42px;
+    height: 42px;
+  }
+  .room-code-chip {
+    padding: 0 10px;
+    gap: 6px;
+  }
+  .room-code-chip .label-word {
+    display: none;
+  }
+  .stepper .s {
+    font-size: 10.5px;
+    white-space: nowrap;
+  }
 }
 
 .room-code-chip {
