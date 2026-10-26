@@ -103,9 +103,16 @@ async function shot(page, name) {
 
   console.log('4) Hints in turn');
   for (let turn = 1; turn <= 4; turn++) {
+    // The player whose turn it is: input visible AND their page already shows the
+    // previous hints (so we never grab the last player's not-yet-updated screen).
     let mine = null;
-    for (let tries = 0; tries < 50 && !mine; tries++) {
-      for (const p of pages) if (await p.getByTestId('hint-input').isVisible().catch(() => false)) mine = p;
+    for (let tries = 0; tries < 100 && !mine; tries++) {
+      for (const p of pages) {
+        const ready = await p
+          .evaluate((n) => !!document.querySelector('[data-testid=hint-input]') && document.querySelectorAll('[data-testid=hint-feed] .hint').length === n, turn - 1)
+          .catch(() => false);
+        if (ready) mine = p;
+      }
       if (!mine) await host.waitForTimeout(100);
     }
     assert(!!mine, `turn ${turn}: exactly one player can type`);
