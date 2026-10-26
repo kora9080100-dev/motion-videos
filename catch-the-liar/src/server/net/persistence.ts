@@ -1,4 +1,4 @@
-import type { Repository } from '../db/repository';
+import type { GameRepository } from '../db/repository';
 import type { GameRoom } from '../game/room';
 import type { RoomEvent } from '../game/types';
 
@@ -14,7 +14,7 @@ export class Persistence {
   private snapshotTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(
-    private readonly repo: Repository,
+    private readonly repo: GameRepository,
     private readonly log: (msg: string, err?: unknown) => void = (m, e) => console.error(m, e),
   ) {}
 

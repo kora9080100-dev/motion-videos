@@ -53,7 +53,7 @@ BASE_URL=http://localhost:3000 npm run e2e # ٤ متصفحات منفصلة يل
 | الواجهة | React 19 + Vite + TypeScript، CSS مخصص (RTL، Mobile First)، خط Cairo مستضاف داخلياً |
 | الاتصال المباشر | Socket.IO (WebSocket مع بديل تلقائي) |
 | السيرفر | Node.js 22 + Express 5، محرك لعبة واحد يملك الحالة (server-authoritative) |
-| قاعدة البيانات | PostgreSQL (Supabase / Neon / Render) عبر `DATABASE_URL`، أو PGlite مدمجة للتجربة |
+| قاعدة البيانات | PostgreSQL (Supabase / Neon / Render) عبر `DATABASE_URL`. بدونها: PGlite مدمجة أثناء التطوير، وذاكرة فقط في الإنتاج (PGlite تحتاج ~650MB) |
 | التحقق | Zod لكل رسالة واردة + تحقق المحرك من الدور والمرحلة والصلاحية |
 
 ```

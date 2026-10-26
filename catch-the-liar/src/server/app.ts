@@ -7,7 +7,7 @@ import { Server } from 'socket.io';
 import { normalizeRoomCode } from '../shared/text';
 import { MAX_PLAYERS, MIN_PLAYERS, type PublicConfig } from '../shared/types';
 import type { AppConfig } from './config';
-import type { Repository } from './db/repository';
+import type { GameRepository } from './db/repository';
 import type { RoomDeps } from './game/room';
 import type { Catalog } from './game/types';
 import { resolveFeatures } from './monetization';
@@ -29,7 +29,7 @@ export interface GameServerHandle {
 
 export function createGameServer(opts: {
   config: AppConfig;
-  repo: Repository;
+  repo: GameRepository;
   catalog: Catalog;
   rng?: () => number;
 }): GameServerHandle {

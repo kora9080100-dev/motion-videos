@@ -4,7 +4,8 @@ export interface AppConfig {
   production: boolean;
   databaseUrl?: string;
   databaseSsl?: string;
-  pgliteDir: string;
+  /** Embedded PGlite folder; undefined means no database (memory only). */
+  pgliteDir?: string;
   trustProxy: boolean;
   allowedOrigins: string[];
   clientDir: string;
@@ -23,7 +24,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     production,
     databaseUrl: env.DATABASE_URL || undefined,
     databaseSsl: env.DATABASE_SSL || undefined,
-    pgliteDir: env.PGLITE_DIR ?? (production ? 'memory://' : '.data/pglite'),
+    // Embedded PGlite needs ~650MB RAM, too much for small/free hosts, so production
+    // defaults to memory-only unless PGLITE_DIR or DATABASE_URL is set.
+    pgliteDir: env.PGLITE_DIR || (production ? undefined : '.data/pglite'),
     trustProxy: env.TRUST_PROXY ? env.TRUST_PROXY === '1' || env.TRUST_PROXY === 'true' : production,
     allowedOrigins: (env.ALLOWED_ORIGINS ?? '')
       .split(',')

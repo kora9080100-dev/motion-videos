@@ -3,9 +3,10 @@ import { createGameServer } from './app';
 import { loadConfig } from './config';
 import { WordCatalog } from './content/catalog';
 import { BUILTIN_PACKS } from './content/index';
-import { openDatabase } from './db/client';
+import { openDatabase, type Db } from './db/client';
+import { MemoryRepository } from './db/memoryRepository';
 import { migrate } from './db/migrations';
-import { Repository } from './db/repository';
+import { Repository, type GameRepository } from './db/repository';
 import type { Catalog, Rng } from './game/types';
 
 /** Lets the catalog be reloaded from the database without restarting rooms. */
@@ -24,11 +25,18 @@ class LiveCatalog implements Catalog {
 
 async function main(): Promise<void> {
   const config = loadConfig();
-  const db = await openDatabase({ url: config.databaseUrl, ssl: config.databaseSsl, pgliteDir: config.pgliteDir });
-  const applied = await migrate(db);
-  console.log(`[db] ${db.kind} ready${applied.length ? `, applied migrations ${applied.join(', ')}` : ''}`);
+  let db: Db | null = null;
+  let repo: GameRepository;
+  if (config.databaseUrl || config.pgliteDir) {
+    db = await openDatabase({ url: config.databaseUrl, ssl: config.databaseSsl, pgliteDir: config.pgliteDir });
+    const applied = await migrate(db);
+    console.log(`[db] ${db.kind} ready${applied.length ? `, applied migrations ${applied.join(', ')}` : ''}`);
+    repo = new Repository(db);
+  } else {
+    console.warn('[db] DATABASE_URL not set: running without a database (rooms live in memory only)');
+    repo = new MemoryRepository();
+  }
 
-  const repo = new Repository(db);
   await repo.seedPacks(BUILTIN_PACKS);
   const catalog = new LiveCatalog(new WordCatalog(await repo.loadCatalog()));
   console.log(`[content] ${catalog.packs().length} packs loaded`);
@@ -66,7 +74,7 @@ async function main(): Promise<void> {
     force.unref();
     try {
       await server.close();
-      await db.close();
+      await db?.close();
     } finally {
       process.exit(0);
     }

@@ -4,8 +4,26 @@ import type { LeaveReason, PlayerState, RoomState, RoundState } from '../game/ty
 import type { RoundEndReason } from '../../shared/types';
 import type { Db } from './client';
 
-/** All database reads/writes used by the game server. */
-export class Repository {
+/** Everything the game server reads from / writes to storage. */
+export interface GameRepository {
+  seedPacks(packs: PackDefinition[]): Promise<void>;
+  loadCatalog(): Promise<CatalogPack[]>;
+  insertRoom(state: RoomState): Promise<void>;
+  updateRoomSettings(state: RoomState): Promise<void>;
+  closeRoom(roomId: string): Promise<void>;
+  insertPlayer(roomId: string, p: PlayerState): Promise<void>;
+  markPlayerLeft(playerId: string, reason: LeaveReason): Promise<void>;
+  updateScores(players: PlayerState[]): Promise<void>;
+  insertRound(roomId: string, r: RoundState): Promise<void>;
+  insertHint(roundId: string, h: { playerId: string; hintRound: number; text: string | null; at: number }): Promise<void>;
+  finishRound(r: RoundState, reason: RoundEndReason): Promise<void>;
+  saveSnapshot(roomId: string, json: string): Promise<void>;
+  loadSnapshots(maxAgeMinutes: number): Promise<RoomState[]>;
+  closeOrphanRooms(keepIds: string[]): Promise<number>;
+}
+
+/** PostgreSQL / PGlite implementation. */
+export class Repository implements GameRepository {
   constructor(private readonly db: Db) {}
 
   // ------------------------------------------------------------- content
