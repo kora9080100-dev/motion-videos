@@ -1,0 +1,20 @@
+# Render Blueprint for «اكشف الكذبة» — https://render.com/docs/blueprint-spec
+# New → Blueprint → pick this repository (and the branch that has the game).
+services:
+  - type: web
+    name: catch-the-liar
+    runtime: node
+    rootDir: catch-the-liar
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      # Optional: add DATABASE_URL (Supabase / Neon) in the dashboard to keep data and
+      # live rooms across restarts. Without it an in-memory database is used.
