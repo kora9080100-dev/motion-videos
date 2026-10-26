@@ -3,6 +3,7 @@ import { NICKNAME_MAX, ROOM_CODE_LENGTH } from '../../shared/types';
 import { isValidRoomCode, normalizeRoomCode, validateNickname } from '../../shared/text';
 import { Button, LogoMark } from '../components/ui';
 import { HowToPlay } from '../components/HowToPlay';
+import { Tutorial } from '../components/Tutorial';
 import { navigate } from '../lib/router';
 import { getNickname, saveNickname } from '../lib/session';
 import { game } from '../lib/store';
@@ -13,6 +14,7 @@ export function Home() {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState<'create' | 'join' | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   function checkName(): string | null {
     const v = validateNickname(nickname);
@@ -117,7 +119,11 @@ export function Home() {
       <section className="card">
         <div className="card-title">🎯 كيف نلعب؟</div>
         <HowToPlay />
+        <Button variant="ghost" size="sm" block onClick={() => setHelpOpen(true)} style={{ marginTop: 12 }}>
+          📖 الشرح خطوة بخطوة مع مثال
+        </Button>
       </section>
+      <Tutorial open={helpOpen} onClose={() => setHelpOpen(false)} />
 
       <footer className="footer">اكشف الكذبة • العب مع ربعك من أي مكان</footer>
     </main>

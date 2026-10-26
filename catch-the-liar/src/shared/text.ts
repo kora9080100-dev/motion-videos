@@ -80,3 +80,35 @@ export function hintRevealsWord(hint: string, word: string): boolean {
   }
   return false;
 }
+
+const PREFIXES = ['وال', 'بال', 'فال', 'كال', 'لل', 'ال', 'و', 'ب', 'ف', 'ل', 'ك'];
+
+function wordForms(token: string): string[] {
+  const forms = [token];
+  for (const p of PREFIXES) {
+    if (token.startsWith(p) && token.length - p.length >= 2) forms.push(token.slice(p.length));
+  }
+  return forms;
+}
+
+/**
+ * Whole-word check used for chat: true when a message names the secret word ("الكبسة",
+ * "وكبسة", "ك ب س ة"), but not when the word is just part of a longer one ("شايف" vs "شاي").
+ */
+export function mentionsWord(text: string, word: string): boolean {
+  const split = (s: string) => s.split(/\s+/).map(normalizeForCompare).filter(Boolean);
+  const tokens = split(text);
+  const target = split(word).map((t) => (t.startsWith('ال') && t.length > 3 ? t.slice(2) : t));
+  if (tokens.length === 0 || target.length === 0) return false;
+  const singles = tokens.filter((t) => Array.from(t).length === 1);
+  if (singles.length >= 3 && tokens.join('').includes(target.join(''))) return true;
+  const forms = tokens.map(wordForms);
+  for (let i = 0; i + target.length <= tokens.length; i++) {
+    if (target.every((t, j) => forms[i + j]!.includes(t))) return true;
+  }
+  // Distinctive part of a multi-word answer ("وحشي" in "حمار وحشي").
+  if (target.length > 1) {
+    for (const t of target) if (t.length >= 4 && forms.some((f) => f.includes(t))) return true;
+  }
+  return false;
+}

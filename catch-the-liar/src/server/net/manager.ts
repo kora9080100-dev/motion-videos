@@ -203,6 +203,19 @@ export class RoomManager {
     this.timers.set(room.code, timer);
   }
 
+  /** Delivers new chat messages without re-sending the whole room state. */
+  commitChat(room: GameRoom): void {
+    for (const e of room.drainEvents()) {
+      if (e.type !== 'chat') continue;
+      for (const p of room.state.players) this.io.to(playerChannel(p.id)).emit('chat:message', e.message);
+    }
+    this.persistence.scheduleSnapshot(room);
+  }
+
+  sendChatHistory(socket: GameSocket, room: GameRoom): void {
+    socket.emit('chat:history', { code: room.code, messages: room.chatHistory() });
+  }
+
   /** Saves every room immediately (graceful shutdown). */
   snapshotAll(): void {
     for (const room of this.rooms.values()) this.persistence.snapshotNow(room);

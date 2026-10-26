@@ -37,6 +37,8 @@ async function shot(page, name) {
   const pages = [];
   for (let i = 0; i < NAMES.length; i++) {
     const ctx = await browser.newContext({ ...phone, locale: 'ar-SA' });
+    // Everyone except the host has "seen" the guide, so it only pops up for the host.
+    if (i > 0) await ctx.addInitScript(() => localStorage.setItem('ctl.tutorialSeen', '1'));
     contexts.push(ctx);
     const page = await ctx.newPage();
     page.on('pageerror', (err) => {
@@ -55,6 +57,16 @@ async function shot(page, name) {
   const code = (await host.getByTestId('room-code').textContent()).trim();
   assert(/^\d{6}$/.test(code), `room created with code ${code}`);
 
+  console.log('1b) First-time guide');
+  await host.getByTestId('tutorial').waitFor();
+  assert(true, 'the step-by-step guide opens the first time');
+  await host.getByTestId('tutorial-next').click();
+  await host.getByTestId('tutorial-next').click();
+  await shot(host, '01b-tutorial-example');
+  for (let i = 0; i < 3; i++) await host.getByTestId('tutorial-next').click();
+  await host.getByTestId('tutorial').waitFor({ state: 'detached' });
+  assert(true, 'the guide closes with «يلا نلعب»');
+
   console.log('2) Friends join with the link');
   for (let i = 0; i < guests.length; i++) {
     const g = guests[i];
@@ -70,6 +82,21 @@ async function shot(page, name) {
   await guests[0].waitForFunction(() => document.body.innerText.includes('جولات التلميح'));
   await shot(host, '03-lobby-host');
   await shot(guests[0], '04-lobby-guest');
+
+  console.log('2b) Chat');
+  await guests[0].getByTestId('chat-button').click();
+  await guests[0].getByTestId('chat-input').fill('هلا والله 👋 جاهزين؟');
+  await guests[0].getByTestId('chat-send').click();
+  await host.locator('[data-testid=chat-button] .badge-count').waitFor();
+  assert(true, 'the host sees an unread badge');
+  await host.getByTestId('chat-button').click();
+  await host.getByTestId('chat-list').getByText('هلا والله 👋 جاهزين؟').waitFor();
+  await host.getByTestId('chat-input').fill('يلا نبدأ 🔥');
+  await host.getByTestId('chat-send').click();
+  await guests[0].getByTestId('chat-list').getByText('يلا نبدأ 🔥').waitFor();
+  assert(true, 'messages arrive live both ways');
+  await shot(guests[0], '04b-chat');
+  for (const p of [host, guests[0]]) await p.keyboard.press('Escape');
 
   console.log('3) Start round & secret roles');
   await host.getByTestId('start-round').click();
@@ -194,6 +221,7 @@ async function shot(page, name) {
 
   console.log('10) Desktop layout');
   const desk = await browser.newContext({ viewport: { width: 1366, height: 900 }, locale: 'ar-SA' });
+  await desk.addInitScript(() => localStorage.setItem('ctl.tutorialSeen', '1'));
   const deskPage = await desk.newPage();
   await deskPage.goto(BASE);
   await shot(deskPage, '14-home-desktop');

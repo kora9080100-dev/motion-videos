@@ -21,6 +21,18 @@ export function useCountdown(endsAt: number | null): { seconds: number; fraction
   return { seconds: Math.ceil(left / 1000), fraction: Math.min(1, left / startRef.current.total) };
 }
 
+export function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = () => setMatches(mq.matches);
+    mq.addEventListener('change', onChange);
+    onChange();
+    return () => mq.removeEventListener('change', onChange);
+  }, [query]);
+  return matches;
+}
+
 export function vibrate(pattern: number | number[]): void {
   try {
     navigator.vibrate?.(pattern);

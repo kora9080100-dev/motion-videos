@@ -9,6 +9,8 @@ export const NICKNAME_MIN = 2;
 export const NICKNAME_MAX = 16;
 export const HINT_MAX = 40;
 export const GUESS_OPTIONS = 8;
+export const CHAT_MAX = 200;
+export const CHAT_HISTORY = 50;
 
 export type Phase = 'lobby' | 'reveal' | 'hints' | 'voting' | 'guess' | 'results';
 
@@ -146,6 +148,15 @@ export interface RoomFeatures {
   adsEnabled: boolean;
 }
 
+export interface ChatMessageView {
+  id: string;
+  playerId: string;
+  nickname: string;
+  avatar: number;
+  text: string;
+  at: number;
+}
+
 export interface SessionInfo {
   code: string;
   playerId: string;
@@ -173,6 +184,7 @@ export interface ClientToServerEvents {
   'turn:skip': (p: Record<string, never>, ack: Ack) => void;
   'vote:cast': (p: { targetId: string }, ack: Ack) => void;
   'guess:submit': (p: { word: string }, ack: Ack) => void;
+  'chat:send': (p: { text: string }, ack: Ack) => void;
 }
 
 export type RemovedReason = 'kicked' | 'closed' | 'left' | 'timeout';
@@ -181,6 +193,9 @@ export interface ServerToClientEvents {
   'room:state': (view: RoomView) => void;
   'room:removed': (p: { reason: RemovedReason }) => void;
   notice: (p: { text: string; kind: 'info' | 'warn' }) => void;
+  'chat:message': (m: ChatMessageView) => void;
+  /** Recent messages, sent when a player enters or returns to a room. */
+  'chat:history': (p: { code: string; messages: ChatMessageView[] }) => void;
 }
 
 export interface RoomPreview {

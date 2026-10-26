@@ -2,6 +2,7 @@ import { io, type Socket } from 'socket.io-client';
 import { useSyncExternalStore } from 'react';
 import type {
   AckResult,
+  ChatMessageView,
   ClientToServerEvents,
   RemovedReason,
   RoomView,
@@ -20,6 +21,9 @@ export interface GameState {
   clockOffset: number;
   removed: { code: string; reason: RemovedReason } | null;
   resuming: boolean;
+  chat: ChatMessageView[];
+  /** Server time of the newest message the player has seen (for the unread badge). */
+  chatReadAt: number;
 }
 
 type Listener = () => void;
@@ -39,6 +43,8 @@ let state: GameState = {
   clockOffset: 0,
   removed: null,
   resuming: false,
+  chat: [],
+  chatReadAt: 0,
 };
 const listeners = new Set<Listener>();
 
@@ -77,10 +83,29 @@ socket.on('room:state', (view) => {
   set({ view, clockOffset: view.serverNow - Date.now() });
 });
 socket.on('notice', (n) => toast(n.text, n.kind));
+let unclaimedChat: { code: string; messages: ChatMessageView[] } | null = null;
+socket.on('chat:history', (p) => {
+  if (state.session?.code !== p.code) {
+    unclaimedChat = p;
+    return;
+  }
+  // Coming back after a drop keeps the read marker, so missed messages show as unread.
+  set({ chat: p.messages, chatReadAt: state.chatReadAt > 0 ? state.chatReadAt : latestAt(p.messages) });
+});
+socket.on('chat:message', (m) => {
+  if (!state.session) return;
+  const chat = [...state.chat.filter((x) => x.id !== m.id), m].slice(-100);
+  set({ chat, chatReadAt: m.playerId === state.session.playerId ? Math.max(state.chatReadAt, m.at) : state.chatReadAt });
+});
+
+/** On (re)entering a room, messages sent before you arrived count as read. */
+function latestAt(messages: ChatMessageView[]): number {
+  return messages.length ? messages[messages.length - 1]!.at : 0;
+}
 socket.on('room:removed', ({ reason }) => {
   const code = state.session?.code ?? state.view?.code ?? '';
   if (code) clearSession(code);
-  set({ session: null, view: null, removed: { code, reason } });
+  set({ session: null, view: null, removed: { code, reason }, chat: [], chatReadAt: 0 });
 });
 
 export function ensureConnected(): void {
@@ -127,7 +152,8 @@ export const game = {
 
   /** Re-attach to a room with a stored session. */
   async resume(session: SessionInfo): Promise<AckResult> {
-    set({ session, view: state.view?.code === session.code ? state.view : null, removed: null });
+    const same = state.view?.code === session.code;
+    set({ session, view: same ? state.view : null, removed: null, ...(same ? {} : { chat: [], chatReadAt: 0 }) });
     markActive(session.code);
     if (!socket.connected) {
       ensureConnected();
@@ -142,13 +168,18 @@ export const game = {
       await emit('room:leave');
       clearSession(code);
     }
-    set({ session: null, view: null, removed: null });
+    set({ session: null, view: null, removed: null, chat: [], chatReadAt: 0 });
   },
 
   /** Forget the current room locally (e.g. navigating home) without leaving it. */
   detachLocal(): void {
     if (state.session && socket.connected) void emit('room:detach');
-    set({ session: null, view: null, removed: null });
+    set({ session: null, view: null, removed: null, chat: [], chatReadAt: 0 });
+  },
+
+  markChatRead(): void {
+    const last = state.chat[state.chat.length - 1];
+    if (last && last.at > state.chatReadAt) set({ chatReadAt: last.at });
   },
 
   clearRemoved(): void {
@@ -165,9 +196,13 @@ function adopt(s: SessionInfo, nickname: string): void {
   saveSession(s, nickname);
   const early = lastUnclaimedView?.code === s.code && lastUnclaimedView.meId === s.playerId ? lastUnclaimedView : null;
   lastUnclaimedView = null;
+  const history = unclaimedChat?.code === s.code ? unclaimedChat.messages : [];
+  unclaimedChat = null;
   set({
     session: { code: s.code, playerId: s.playerId, token: s.token },
     removed: null,
+    chat: history,
+    chatReadAt: latestAt(history),
     ...(early ? { view: early, clockOffset: early.serverNow - Date.now() } : { view: null }),
   });
 }

@@ -8,7 +8,7 @@ import { BUILTIN_PACKS } from '../src/server/content/index';
 import { openDatabase, type Db } from '../src/server/db/client';
 import { migrate } from '../src/server/db/migrations';
 import { Repository } from '../src/server/db/repository';
-import type { AckResult, ClientToServerEvents, RoomView, ServerToClientEvents, SessionInfo } from '../src/shared/types';
+import type { AckResult, ChatMessageView, ClientToServerEvents, RoomView, ServerToClientEvents, SessionInfo } from '../src/shared/types';
 
 type ClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -38,6 +38,7 @@ afterAll(async () => {
 class Player {
   socket: ClientSocket;
   view: RoomView | null = null;
+  chat: ChatMessageView[] = [];
   session: SessionInfo | null = null;
   notices: string[] = [];
   removed: string | null = null;
@@ -49,6 +50,12 @@ class Player {
       this.view = v;
     });
     this.socket.on('notice', (n) => this.notices.push(n.text));
+    this.socket.on('chat:history', (h) => {
+      this.chat = h.messages;
+    });
+    this.socket.on('chat:message', (m) => {
+      this.chat.push(m);
+    });
     this.socket.on('room:removed', (p) => {
       this.removed = p.reason;
     });
@@ -220,6 +227,24 @@ describe('realtime server', () => {
     expect(config.minPlayers).toBe(3);
     const res = await fetch(`${url}/api/rooms/123`);
     expect(await res.json()).toEqual({ exists: false });
+  });
+
+  it('delivers chat live and sends recent history to people who join or come back', async () => {
+    const host = new Player('دردشة');
+    const code = await host.create();
+    const a = new Player('ريان');
+    await a.join(code);
+    await until(() => host.view?.players.length === 2);
+    expect((await host.emit('chat:send', { text: 'هلا ريان 👋' })).ok).toBe(true);
+    await until(() => a.chat.some((m) => m.text === 'هلا ريان 👋'), 'live chat');
+    expect((await a.emit('chat:send', { text: 'www.spam.com' })).ok).toBe(false);
+    const late = new Player('لمى');
+    await late.join(code);
+    await until(() => late.chat.some((m) => m.text === 'هلا ريان 👋'), 'history for newcomer');
+    a.socket.disconnect();
+    const back = new Player('ريان');
+    await back.emit('room:resume', a.session!);
+    await until(() => back.chat.length >= 1, 'history after reconnect');
   });
 
   it('a locked room refuses newcomers but lets members reconnect', async () => {

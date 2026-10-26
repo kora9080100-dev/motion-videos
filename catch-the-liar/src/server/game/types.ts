@@ -1,4 +1,4 @@
-import type { CategoryView, PackInfo, Phase, RoomSettings, RoundEndReason, RoundResultView } from '../../shared/types';
+import type { CategoryView, ChatMessageView, PackInfo, Phase, RoomSettings, RoundEndReason, RoundResultView } from '../../shared/types';
 
 /** Full server-side state of a room. Never sent to clients as-is (see GameRoom.viewFor). */
 export interface RoomState {
@@ -11,6 +11,8 @@ export interface RoomState {
   bannedTokenHashes: string[];
   /** Host closed the room to new players. Optional for snapshots saved before it existed. */
   locked?: boolean;
+  /** Recent chat messages (capped). Optional for older snapshots. */
+  chat?: ChatMessageView[];
   settings: RoomSettings;
   phase: Phase;
   phaseEndsAt: number | null;
@@ -105,6 +107,7 @@ export type RoomEvent =
   | { type: 'round_ended'; round: RoundState; reason: RoundEndReason }
   | { type: 'scores_changed' }
   | { type: 'notice'; text: string; kind: 'info' | 'warn'; exclude?: string }
+  | { type: 'chat'; message: ChatMessageView }
   | { type: 'room_closed' };
 
 export type OpResult = { ok: true } | { ok: false; error: string };

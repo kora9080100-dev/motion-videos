@@ -1,4 +1,6 @@
 import {
+  CHAT_HISTORY,
+  CHAT_MAX,
   DEFAULT_SETTINGS,
   GUESS_OPTIONS,
   HINT_MAX,
@@ -6,6 +8,7 @@ import {
   MIN_PLAYERS,
   POINTS,
   SETTINGS_LIMITS,
+  type ChatMessageView,
   type HintRounds,
   type Phase,
   type PointReason,
@@ -16,7 +19,7 @@ import {
   type RoundResultView,
   type SecretView,
 } from '../../shared/types';
-import { cleanText, hintRevealsWord, validateNickname } from '../../shared/text';
+import { cleanText, hintRevealsWord, mentionsWord, validateNickname } from '../../shared/text';
 import { isOffensive } from '../moderation';
 import {
   AVATAR_COUNT,
@@ -49,6 +52,10 @@ export interface RoomDeps {
 }
 
 const ACTIVE_PHASES: readonly Phase[] = ['reveal', 'hints', 'voting', 'guess'];
+const LINK_RE = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|net|org|io|me|sa|ly|gg|xyz|app|link|ru|tk|info|co)\b)/i;
+/** Chat flood guard: at most this many messages per player within the window. */
+const CHAT_BURST = 4;
+const CHAT_WINDOW_MS = 6_000;
 const OK: OpResult = { ok: true };
 const fail = (error: string): OpResult => ({ ok: false, error });
 
@@ -257,6 +264,45 @@ export class GameRoom {
     this.state.phaseEndsAt = null;
     this.emit({ type: 'room_closed' });
     this.touch();
+  }
+
+  // ---------------------------------------------------------------- chat
+
+  /** Posts a chat message. Does not change game state, so it does not bump `rev`. */
+  postChat(byId: string, text: unknown, now: number): OpResult {
+    const s = this.state;
+    const p = this.getPlayer(byId);
+    if (s.closed || !p) return fail(ERR.closed);
+    const clean = cleanText(text, CHAT_MAX);
+    if (!clean) return fail('اكتب رسالة أول');
+    if (LINK_RE.test(clean)) return fail('ممنوع الروابط في الدردشة 🔗');
+    if (isOffensive(clean)) return fail('الرسالة فيها كلمة غير لائقة 🙏');
+    const r = s.round;
+    // Civilians must not leak the word. The liar is never checked, so a rejection can't
+    // tell them they guessed right.
+    if (r && this.isActivePhase() && r.participants.includes(byId) && byId !== r.liarId && mentionsWord(clean, r.word)) {
+      return fail('لا تكتب الكلمة السرية في الدردشة 😅');
+    }
+    const chat = (s.chat ??= []);
+    if (chat.filter((m) => m.playerId === byId && now - m.at < CHAT_WINDOW_MS).length >= CHAT_BURST) {
+      return fail('شوي شوي على الدردشة 😅');
+    }
+    const message: ChatMessageView = {
+      id: this.deps.newId(),
+      playerId: byId,
+      nickname: p.nickname,
+      avatar: p.avatar,
+      text: clean,
+      at: now,
+    };
+    chat.push(message);
+    if (chat.length > CHAT_HISTORY) chat.splice(0, chat.length - CHAT_HISTORY);
+    this.emit({ type: 'chat', message });
+    return OK;
+  }
+
+  chatHistory(): ChatMessageView[] {
+    return this.state.chat ?? [];
   }
 
   // ---------------------------------------------------------------- host controls

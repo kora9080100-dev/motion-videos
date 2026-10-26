@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { NICKNAME_MAX, type RoomPreview, type RoomView } from '../../shared/types';
 import { validateNickname } from '../../shared/text';
-import { HowToPlay } from '../components/HowToPlay';
+import { ChatButton, ChatPanel } from '../components/Chat';
+import { Tutorial, tutorialSeen } from '../components/Tutorial';
 import { ShareSheet } from '../components/Invite';
 import { Scoreboard } from '../components/Scoreboard';
 import { Avatar, Button, ConnectionBanner, LogoMark, PhaseStepper, Sheet } from '../components/ui';
-import { useOnChange, vibrate } from '../lib/hooks';
+import { useMediaQuery, useOnChange, vibrate } from '../lib/hooks';
 import { navigate } from '../lib/router';
 import { getNickname, getSession, isActiveInThisTab, saveNickname } from '../lib/session';
 import { game, useGame } from '../lib/store';
@@ -48,6 +49,9 @@ function RoomScreen({ view, connected }: { view: RoomView; connected: boolean })
   const [shareOpen, setShareOpen] = useState(false);
   const [scoresOpen, setScoresOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(() => !tutorialSeen());
+  const desktop = useMediaQuery('(min-width: 960px)');
 
   useOnChange(view.phase, (phase) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -73,9 +77,13 @@ function RoomScreen({ view, connected }: { view: RoomView; connected: boolean })
         </button>
         <span className="spacer" />
         {view.roundNumber > 0 && <span className="round-pill">الجولة {view.roundNumber}</span>}
+        <button className="icon-btn" onClick={() => setHelpOpen(true)} aria-label="كيف نلعب؟" data-testid="help-button">
+          ❓
+        </button>
         <button className="icon-btn" onClick={() => setScoresOpen(true)} aria-label="لوحة النقاط">
           🏆
         </button>
+        <ChatButton meId={view.meId} onClick={() => setChatOpen(true)} />
       </header>
 
       <PhaseStepper phase={view.phase} />
@@ -91,14 +99,20 @@ function RoomScreen({ view, connected }: { view: RoomView; connected: boolean })
         </main>
         <aside className="room-side stack">
           {(view.phase === 'reveal' || view.phase === 'hints' || view.phase === 'voting') && <PlayersStatus view={view} />}
-          <section className="card desktop-only">
-            <div className="card-title">🎯 تذكير بالقوانين</div>
-            <HowToPlay />
-          </section>
+          {desktop && (
+            <section className="card chat-card">
+              <div className="card-title">💬 الدردشة</div>
+              <ChatPanel view={view} active />
+            </section>
+          )}
         </aside>
       </div>
 
       <ShareSheet view={view} open={shareOpen} onClose={() => setShareOpen(false)} />
+      <Sheet open={chatOpen && !desktop} onClose={() => setChatOpen(false)} title="💬 الدردشة">
+        <ChatPanel view={view} active={chatOpen && !desktop} />
+      </Sheet>
+      <Tutorial open={helpOpen} onClose={() => setHelpOpen(false)} />
       <Sheet open={scoresOpen} onClose={() => setScoresOpen(false)} title="🏆 لوحة النقاط">
         <Scoreboard view={view} />
       </Sheet>

@@ -34,6 +34,7 @@ const schemas = {
   hint: z.object({ text: z.string().max(200) }),
   vote: z.object({ targetId: z.string().uuid() }),
   guess: z.object({ word: z.string().max(100) }),
+  chat: z.object({ text: z.string().max(1000) }),
 };
 
 export function hashToken(token: string): string {
@@ -104,6 +105,7 @@ export function registerHandlers(io: GameServer, manager: RoomManager, newId: ()
       manager.attach(socket, room, playerId);
       ack({ ok: true, code: room.code, playerId, token });
       manager.commit(room);
+      manager.sendChatHistory(socket, room);
       return true;
     }
 
@@ -140,6 +142,7 @@ export function registerHandlers(io: GameServer, manager: RoomManager, newId: ()
       manager.attach(socket, room, player.id);
       ack({ ok: true });
       manager.commit(room);
+      manager.sendChatHistory(socket, room);
     });
 
     on('room:leave', empty, (_p, ack) => {
@@ -168,6 +171,14 @@ export function registerHandlers(io: GameServer, manager: RoomManager, newId: ()
     act('turn:skip', empty, (room, by, _p, now) => room.skipTurn(by, now));
     act('vote:cast', schemas.vote, (room, by, p: { targetId: string }, now) => room.castVote(by, p.targetId, now));
     act('guess:submit', schemas.guess, (room, by, p: { word: string }, now) => room.submitGuess(by, p.word, now));
+
+    on('chat:send', schemas.chat, (p, ack) => {
+      const ctx = manager.context(socket);
+      if (!ctx) return ack({ ok: false, error: MSG.noSession });
+      const res = ctx.room.postChat(ctx.playerId, p.text, Date.now());
+      ack(res);
+      if (res.ok) manager.commitChat(ctx.room);
+    });
 
     socket.on('disconnect', () => manager.detach(socket));
   });

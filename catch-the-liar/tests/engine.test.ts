@@ -75,6 +75,43 @@ describe('room protection', () => {
   });
 });
 
+describe('chat', () => {
+  it('posts messages without changing game state and keeps the last 50', () => {
+    const { room, ids } = roomWith(3);
+    const rev = room.state.rev;
+    expect(room.postChat(ids[0]!, 'هلا والله 👋', T0).ok).toBe(true);
+    const [e] = room.drainEvents();
+    expect(e).toMatchObject({ type: 'chat', message: { playerId: ids[0], nickname: 'لاعب1', text: 'هلا والله 👋' } });
+    expect(room.state.rev).toBe(rev);
+    for (let i = 0; i < 60; i++) room.postChat(ids[i % 3]!, `رسالة ${i}`, T0 + i * 10_000);
+    expect(room.chatHistory()).toHaveLength(50);
+    expect(room.chatHistory().at(-1)!.text).toBe('رسالة 59');
+  });
+
+  it('blocks links, bad words, empty text and flooding', () => {
+    const { room, ids } = roomWith(3);
+    expect(room.postChat(ids[0]!, 'شوفوا www.example.com', T0).ok).toBe(false);
+    expect(room.postChat(ids[0]!, 'https://x.y', T0).ok).toBe(false);
+    expect(room.postChat(ids[0]!, 'يا شرموط', T0).ok).toBe(false);
+    expect(room.postChat(ids[0]!, '   ', T0).ok).toBe(false);
+    for (let i = 0; i < 4; i++) expect(room.postChat(ids[1]!, `سبام ${i}`, T0 + i).ok).toBe(true);
+    expect(room.postChat(ids[1]!, 'سبام 5', T0 + 5).ok).toBe(false);
+    expect(room.postChat(ids[1]!, 'رجعت', T0 + 7_000).ok).toBe(true);
+    expect(room.postChat('nobody', 'hi', T0).ok).toBe(false);
+  });
+
+  it('stops civilians from leaking the word, but never tells the liar anything', () => {
+    const { room, ids } = roomWith(4);
+    startToHints(room, ids);
+    const r = room.state.round!;
+    const civ = r.participants.find((id) => id !== r.liarId)!;
+    expect(room.postChat(civ, `الكلمة ${r.word}`, T0)).toMatchObject({ ok: false });
+    expect(room.postChat(civ, 'أنا شاك في واحد منكم', T0).ok).toBe(true);
+    // The liar may type anything, even a correct guess, and gets no hint from a rejection.
+    expect(room.postChat(r.liarId, `هي ${r.word}؟`, T0).ok).toBe(true);
+  });
+});
+
 describe('starting a round', () => {
   it('needs the host and at least 3 connected players', () => {
     const { room, ids } = roomWith(3);

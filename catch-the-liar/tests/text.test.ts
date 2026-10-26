@@ -34,3 +34,22 @@ describe('text helpers', () => {
     expect(hintRevealsWord('مشروب', 'شاي')).toBe(false);
   });
 });
+
+describe('mentionsWord (chat)', () => {
+  it('catches the secret word as a whole word, with prefixes or spelled out', async () => {
+    const { mentionsWord } = await import('../src/shared/text');
+    expect(mentionsWord('هي الكبسة أكيد', 'كبسة')).toBe(true);
+    expect(mentionsWord('وكبسه', 'كبسة')).toBe(true);
+    expect(mentionsWord('ك ب س ة', 'كبسة')).toBe(true);
+    expect(mentionsWord('اكيد حمار وحشي', 'حمار وحشي')).toBe(true);
+    expect(mentionsWord('شي وحشي', 'حمار وحشي')).toBe(true);
+  });
+
+  it('allows normal chat that merely contains the letters', async () => {
+    const { mentionsWord } = await import('../src/shared/text');
+    expect(mentionsWord('شايف كلامك غريب', 'شاي')).toBe(false);
+    expect(mentionsWord('مستمر يكذب', 'تمر')).toBe(false);
+    expect(mentionsWord('رجلي تعبت', 'كرة قدم')).toBe(false);
+    expect(mentionsWord('هههه', 'كبسة')).toBe(false);
+  });
+});
