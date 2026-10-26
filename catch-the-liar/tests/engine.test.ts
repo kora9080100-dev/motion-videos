@@ -10,7 +10,7 @@ import {
 } from '../src/server/game/constants';
 import type { RoomState } from '../src/server/game/types';
 import { POINTS } from '../src/shared/types';
-import { T0, currentTurn, liarOf, playAllHints, roomWith, startToHints, testDeps } from './helpers';
+import { T0, currentTurn, liarOf, playAllHints, roomWith, startToHints, testDeps, testPacks } from './helpers';
 
 describe('room membership', () => {
   it('makes the first player host and validates nicknames', () => {
@@ -112,6 +112,75 @@ describe('chat', () => {
   });
 });
 
+describe('harder rules', () => {
+  it('nobody may repeat a hint that was already given (the liar included)', () => {
+    const { room, ids } = roomWith(4);
+    room.updateSettings(ids[0]!, { difficulty: 'normal', hintRounds: 2 });
+    startToHints(room, ids);
+    const say = (text: string) => room.submitHint(currentTurn(room), text, T0);
+    expect(say('مطعم').ok).toBe(true);
+    expect(say('المطعم')).toMatchObject({ ok: false });
+    expect(say('ومطعم')).toMatchObject({ ok: false });
+    expect(say('مطعم شعبي').ok).toBe(true); // adds a new word
+    expect(say('شعبي')).toMatchObject({ ok: false });
+    expect(say('لذيذ').ok).toBe(true);
+    // Every player, including the liar, is held to the same rule.
+    expect(room.state.round!.hints.map((h) => h.text)).toEqual(['مطعم', 'مطعم شعبي', 'لذيذ']);
+  });
+
+  it('hard mode: one-word hints and no category for the liar', () => {
+    const { room, ids } = roomWith(3);
+    expect(room.state.settings.difficulty).toBe('hard');
+    room.updateSettings(ids[0]!, { liarSeesCategory: true });
+    startToHints(room, ids);
+    expect(room.viewFor(liarOf(room), T0).secret).toEqual({ role: 'liar', category: null });
+    expect(room.submitHint(currentTurn(room), 'كلمتين هنا', T0)).toMatchObject({ ok: false });
+    expect(room.submitHint(currentTurn(room), 'كلمة', T0).ok).toBe(true);
+  });
+
+  it('normal mode still allows short phrases', () => {
+    const { room, ids } = roomWith(3);
+    room.updateSettings(ids[0]!, { difficulty: 'normal' });
+    startToHints(room, ids);
+    expect(room.submitHint(currentTurn(room), 'غدا الجمعة', T0).ok).toBe(true);
+  });
+
+  it('expert mode: the liar gets a different word and a card identical in shape', () => {
+    const { room, ids } = roomWith(4);
+    room.updateSettings(ids[0]!, { difficulty: 'expert' });
+    room.startRound(ids[0]!, T0);
+    const r = room.state.round!;
+    expect(r.decoyWord).toBeTruthy();
+    expect(r.decoyWord).not.toBe(r.word);
+    const liarView = room.viewFor(r.liarId, T0);
+    const civView = room.viewFor(r.participants.find((id) => id !== r.liarId)!, T0);
+    expect(liarView.secret).toEqual({ role: 'civilian', word: r.decoyWord, category: r.category });
+    expect(Object.keys(liarView.secret!).sort()).toEqual(Object.keys(civView.secret!).sort());
+    expect(JSON.stringify(liarView)).not.toContain(r.word);
+    for (const id of r.participants) room.markReady(id, T0);
+    // The liar is checked against their own (decoy) word, exactly like everyone else.
+    while (currentTurn(room) !== r.liarId) room.submitHint(currentTurn(room), `ت${r.hints.length}`, T0);
+    expect(room.submitHint(r.liarId, r.decoyWord!, T0)).toMatchObject({ ok: false });
+    expect(room.postChat(r.liarId, `كلمتي ${r.decoyWord}`, T0)).toMatchObject({ ok: false });
+  });
+
+  it('expert mode: caught liar guesses from 12 options without their decoy; result shows both words', () => {
+    const { room, ids } = roomWith(4);
+    room.updateSettings(ids[0]!, { difficulty: 'expert', hintRounds: 1 });
+    startToHints(room, ids);
+    playAllHints(room);
+    const r = room.state.round!;
+    for (const id of r.participants) room.castVote(id, id === r.liarId ? r.participants.find((x) => x !== id)! : r.liarId, T0);
+    expect(room.state.phase).toBe('guess');
+    expect(r.guessOptions).toHaveLength(12);
+    expect(r.guessOptions).toContain(r.word);
+    expect(r.guessOptions).not.toContain(r.decoyWord);
+    expect(room.viewFor(r.liarId, T0).secret).toMatchObject({ role: 'liar' });
+    room.submitGuess(r.liarId, r.word, T0);
+    expect(room.viewFor(ids[0]!, T0).result).toMatchObject({ word: r.word, decoyWord: r.decoyWord, difficulty: 'expert' });
+  });
+});
+
 describe('starting a round', () => {
   it('needs the host and at least 3 connected players', () => {
     const { room, ids } = roomWith(3);
@@ -139,13 +208,14 @@ describe('starting a round', () => {
     const { room, ids } = roomWith(3);
     room.updateSettings(ids[0]!, { packIds: ['animals'] });
     const seen = new Set<string>();
-    for (let i = 0; i < 9; i++) {
+    const size = testPacks().find((p) => p.id === 'animals')!.words.length;
+    for (let i = 0; i < size; i++) {
       expect(room.startRound(ids[0]!, T0).ok).toBe(true);
       seen.add(room.state.round!.word);
       room.state.usedWordIds.push(room.state.round!.wordId);
       room.state.phase = 'results';
     }
-    expect(seen.size).toBe(9);
+    expect(seen.size).toBe(size);
     expect(room.startRound(ids[0]!, T0).ok).toBe(true); // cycle restarts
   });
 
@@ -235,7 +305,7 @@ describe('round flow', () => {
     startToHints(room, ids);
     const r = room.state.round!;
     // Rotate turns until a civilian is up.
-    while (currentTurn(room) === r.liarId) room.submitHint(r.liarId, 'شي', T0);
+    while (currentTurn(room) === r.liarId) room.submitHint(r.liarId, 'شيء', T0);
     const res = room.submitHint(currentTurn(room), `أحب ${r.word}`, T0);
     expect(res).toMatchObject({ ok: false });
   });
@@ -286,7 +356,7 @@ describe('voting and scoring', () => {
     expect(room.state.phase).toBe('guess');
     const liarView = room.viewFor(liar, T0);
     const civView = room.viewFor(civilians[0]!, T0);
-    expect(liarView.guess!.options).toHaveLength(8);
+    expect(liarView.guess!.options).toHaveLength(12); // default difficulty is "hard"
     expect(liarView.guess!.options).toContain(r.word);
     expect(civView.guess!.options).toBeNull();
     const wrong = r.guessOptions.find((w) => w !== r.word)!;
@@ -429,7 +499,7 @@ describe('disconnects and leaving', () => {
     const r = room.state.round!;
     let cur = currentTurn(room);
     while (cur === r.liarId) {
-      room.submitHint(cur, 'شي', T0);
+      room.submitHint(cur, 'غامض', T0);
       cur = currentTurn(room);
     }
     room.leave(cur, T0);

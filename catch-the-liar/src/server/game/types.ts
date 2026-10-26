@@ -1,4 +1,4 @@
-import type { CategoryView, ChatMessageView, PackInfo, Phase, RoomSettings, RoundEndReason, RoundResultView } from '../../shared/types';
+import type { CategoryView, ChatMessageView, Difficulty, PackInfo, Phase, RoomSettings, RoundEndReason, RoundResultView } from '../../shared/types';
 
 /** Full server-side state of a room. Never sent to clients as-is (see GameRoom.viewFor). */
 export interface RoomState {
@@ -59,6 +59,10 @@ export interface RoundState {
   category: CategoryView;
   wordId: string;
   word: string;
+  /** Optional for rounds saved before difficulty levels existed (treated as 'normal'). */
+  difficulty?: Difficulty;
+  /** Expert mode: the different word shown to the liar. */
+  decoyWord?: string | null;
   liarId: string;
   liarName: string;
   participants: string[];

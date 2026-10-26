@@ -72,6 +72,11 @@ export function Results({ view }: { view: RoomView }) {
             {r.category.emoji} {r.category.name}
           </span>
         </div>
+        {r.decoyWord && (
+          <p className="center small" data-testid="decoy-word">
+            💀 كلمة الكذّاب كانت: <b style={{ color: 'var(--orange-2)' }}>{r.decoyWord}</b>
+          </p>
+        )}
         {r.guess && (
           <p className="center small dim">
             {r.guess.word ? `خمّن الكذّاب: «${r.guess.word}» ${r.guess.correct ? '✅' : '❌'}` : 'الكذّاب ما لحق يخمّن ⏰'}

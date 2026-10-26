@@ -131,7 +131,7 @@ describe('realtime server', () => {
       const current = all.find((p) => p.id === currentId)!;
       const wrong = all.find((p) => p.id !== currentId)!;
       expect((await wrong.emit('hint:submit', { text: 'مو دوري' })).ok).toBe(false);
-      expect((await current.emit('hint:submit', { text: `تلميح رقم ${turn + 1}` })).ok).toBe(true);
+      expect((await current.emit('hint:submit', { text: `تلميح${turn + 1}` })).ok).toBe(true);
       await until(() => host.view!.hints.length === turn + 1, 'hint broadcast');
     }
     await until(() => all.every((p) => p.view?.phase === 'voting'), 'voting phase');

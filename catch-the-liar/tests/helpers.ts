@@ -27,8 +27,8 @@ export function testPacks(): CatalogPack[] {
     ...extra,
   });
   return [
-    mk('food', 'الأكلات', ['كبسة', 'مندي', 'شاورما', 'برجر', 'بيتزا', 'سمبوسة', 'جريش', 'مرقوق', 'هريس', 'فلافل']),
-    mk('animals', 'الحيوانات', ['جمل', 'أسد', 'نمر', 'فيل', 'زرافة', 'حصان', 'قطة', 'كلب', 'حمار وحشي']),
+    mk('food', 'الأكلات', ['كبسة', 'مندي', 'شاورما', 'برجر', 'بيتزا', 'سمبوسة', 'جريش', 'مرقوق', 'هريس', 'فلافل', 'كشري', 'منسف', 'مقلوبة', 'لقيمات']),
+    mk('animals', 'الحيوانات', ['جمل', 'أسد', 'نمر', 'فيل', 'زرافة', 'حصان', 'قطة', 'كلب', 'حمار وحشي', 'صقر', 'دلفين', 'بطريق', 'غزال', 'ذئب']),
     mk('secret', 'حصري', ['أ', 'ب', 'ج', 'د', 'ه', 'و', 'ز', 'ح'], { tier: 'plus' }),
   ];
 }
@@ -73,7 +73,7 @@ export function currentTurn(room: GameRoom): string {
 export function playAllHints(room: GameRoom, now = T0): void {
   let guard = 0;
   while (room.state.phase === 'hints' && guard++ < 100) {
-    const res = room.submitHint(currentTurn(room), `تلميح ${guard}`, now);
+    const res = room.submitHint(currentTurn(room), `تلميح${guard}`, now);
     if (!res.ok) throw new Error(res.error);
   }
 }

@@ -1,6 +1,12 @@
-import { SETTINGS_LIMITS, type RoomSettings, type RoomView } from '../../shared/types';
+import { SETTINGS_LIMITS, type Difficulty, type RoomSettings, type RoomView } from '../../shared/types';
 import { game } from '../lib/store';
 import { toast } from '../lib/toasts';
+
+export const DIFFICULTY: Record<Difficulty, { label: string; desc: string }> = {
+  normal: { label: '😊 عادي', desc: 'الكذّاب يدري إنه الكذّاب، والتلميح يقدر يكون أكثر من كلمة.' },
+  hard: { label: '🔥 صعب', desc: 'الكذّاب ما يعرف التصنيف، التلميح كلمة وحدة بس، والتخمين من ١٢ خيار.' },
+  expert: { label: '💀 خبير', desc: 'الكذّاب ياخذ كلمة ثانية من نفس التصنيف… وما يدري إنه هو الكذّاب!' },
+};
 
 async function update(patch: Partial<RoomSettings>) {
   const res = await game.send('room:settings', patch);
@@ -9,6 +15,7 @@ async function update(patch: Partial<RoomSettings>) {
 
 export function SettingsCard({ view, editable }: { view: RoomView; editable: boolean }) {
   const s = view.settings;
+  const difficulty = s.difficulty ?? 'normal';
   const packs = view.packs.filter((p) => p.available);
   const all = s.packIds.length === 0;
 
@@ -25,6 +32,10 @@ export function SettingsCard({ view, editable }: { view: RoomView; editable: boo
         <div className="card-title">⚙️ إعدادات الجولة</div>
         <div className="summary-list">
           <div>
+            <span>المستوى</span>
+            <span>{DIFFICULTY[difficulty].label}</span>
+          </div>
+          <div>
             <span>التصنيفات</span>
             <span>{names}</span>
           </div>
@@ -40,10 +51,12 @@ export function SettingsCard({ view, editable }: { view: RoomView; editable: boo
             <span>وقت التصويت</span>
             <span>{s.voteSeconds} ثانية</span>
           </div>
-          <div>
-            <span>الكذّاب يعرف التصنيف</span>
-            <span>{s.liarSeesCategory ? 'نعم' : 'لا'}</span>
-          </div>
+          {difficulty === 'normal' && (
+            <div>
+              <span>الكذّاب يعرف التصنيف</span>
+              <span>{s.liarSeesCategory ? 'نعم' : 'لا'}</span>
+            </div>
+          )}
         </div>
       </section>
     );
@@ -52,6 +65,18 @@ export function SettingsCard({ view, editable }: { view: RoomView; editable: boo
   return (
     <section className="card">
       <div className="card-title">⚙️ إعدادات الجولة</div>
+
+      <div className="setting">
+        <span className="label">مستوى الصعوبة</span>
+        <div className="seg" role="group" aria-label="مستوى الصعوبة">
+          {SETTINGS_LIMITS.difficulty.map((d) => (
+            <button key={d} aria-pressed={difficulty === d} onClick={() => void update({ difficulty: d })} data-testid={`difficulty-${d}`}>
+              {DIFFICULTY[d].label}
+            </button>
+          ))}
+        </div>
+        <span className="small muted">{DIFFICULTY[difficulty].desc}</span>
+      </div>
 
       <div className="setting">
         <span className="label">التصنيفات</span>
@@ -106,6 +131,7 @@ export function SettingsCard({ view, editable }: { view: RoomView; editable: boo
         </div>
       </div>
 
+      {difficulty === 'normal' && (
       <div className="setting">
         <label className="toggle">
           <input
@@ -120,6 +146,7 @@ export function SettingsCard({ view, editable }: { view: RoomView; editable: boo
           </span>
         </label>
       </div>
+      )}
     </section>
   );
 }

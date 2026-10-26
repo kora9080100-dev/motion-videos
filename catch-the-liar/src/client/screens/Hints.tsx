@@ -42,6 +42,7 @@ export function Hints({ view }: { view: RoomView }) {
   }
 
   if (!turn) return null;
+  const oneWord = (view.settings.difficulty ?? 'normal') !== 'normal';
   const doneIds = new Set(view.hints.filter((h) => h.hintRound === turn.hintRound).map((h) => h.playerId));
 
   return (
@@ -85,7 +86,7 @@ export function Hints({ view }: { view: RoomView }) {
               className="input"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="تلميحك هنا…"
+              placeholder={oneWord ? 'كلمة وحدة بس…' : 'تلميحك هنا…'}
               maxLength={HINT_MAX}
               enterKeyHint="send"
               autoComplete="off"
@@ -96,7 +97,7 @@ export function Hints({ view }: { view: RoomView }) {
             </Button>
           </div>
           <div className="row small muted">
-            <span>كلمة أو كلمتين تكفي 👌</span>
+            <span>{oneWord ? 'كلمة وحدة ☝️' : 'كلمة أو كلمتين تكفي 👌'} • لا تكرر تلميح غيرك 🔁</span>
             <span className="spacer" />
             <button type="button" className="btn btn-ghost xs" onClick={skip}>
               تخطي دوري

@@ -9,12 +9,21 @@ export const NICKNAME_MIN = 2;
 export const NICKNAME_MAX = 16;
 export const HINT_MAX = 40;
 export const GUESS_OPTIONS = 8;
+export const GUESS_OPTIONS_HARD = 12;
 export const CHAT_MAX = 200;
 export const CHAT_HISTORY = 50;
 
 export type Phase = 'lobby' | 'reveal' | 'hints' | 'voting' | 'guess' | 'results';
 
 export type HintRounds = 1 | 2 | 3;
+
+/**
+ * normal: the liar knows they are the liar (category per setting).
+ * hard:   the liar never sees the category, hints are one word, 12 guess options.
+ * expert: the liar gets a different word from the same category and doesn't know
+ *         they are the liar; one-word hints, 12 guess options.
+ */
+export type Difficulty = 'normal' | 'hard' | 'expert';
 
 export interface RoomSettings {
   /** Selected word packs; empty means "all free packs". */
@@ -23,12 +32,14 @@ export interface RoomSettings {
   hintSeconds: number;
   voteSeconds: number;
   liarSeesCategory: boolean;
+  difficulty: Difficulty;
 }
 
 export const SETTINGS_LIMITS = {
   hintSeconds: [20, 30, 45, 60, 90],
   voteSeconds: [30, 45, 60, 90, 120],
   hintRounds: [1, 2, 3] as HintRounds[],
+  difficulty: ['normal', 'hard', 'expert'] as Difficulty[],
 } as const;
 
 export const DEFAULT_SETTINGS: RoomSettings = {
@@ -37,6 +48,7 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   hintSeconds: 45,
   voteSeconds: 60,
   liarSeesCategory: true,
+  difficulty: 'hard',
 };
 
 export type PackTier = 'free' | 'plus';
@@ -102,6 +114,9 @@ export interface RoundResultView {
   liarId: string;
   liarName: string;
   word: string;
+  /** Expert mode: the different word the liar was given. */
+  decoyWord: string | null;
+  difficulty: Difficulty;
   category: CategoryView;
   caught: boolean;
   votes: { voterId: string; voterName: string; targetId: string; targetName: string }[];

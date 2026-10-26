@@ -143,8 +143,14 @@ async function shot(page, name) {
       if (!mine) await host.waitForTimeout(100);
     }
     assert(!!mine, `turn ${turn}: exactly one player can type`);
-    if (turn === 2) await shot(mine, '08-hints-my-turn');
-    await mine.getByTestId('hint-input').fill(`تلميح ${turn}`);
+    if (turn === 2) {
+      await shot(mine, '08-hints-my-turn');
+      await mine.getByTestId('hint-input').fill('تلميح1');
+      await mine.getByTestId('hint-send').click();
+      await mine.getByText('انقال قبل', { exact: false }).first().waitFor();
+      assert(true, 'repeating an earlier hint is rejected');
+    }
+    await mine.getByTestId('hint-input').fill(`تلميح${turn}`);
     await mine.getByTestId('hint-send').click();
     await host.waitForFunction((n) => document.querySelectorAll('[data-testid=hint-feed] .hint').length >= n, turn);
   }

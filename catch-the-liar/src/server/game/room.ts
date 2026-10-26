@@ -3,12 +3,14 @@ import {
   CHAT_MAX,
   DEFAULT_SETTINGS,
   GUESS_OPTIONS,
+  GUESS_OPTIONS_HARD,
   HINT_MAX,
   MAX_PLAYERS,
   MIN_PLAYERS,
   POINTS,
   SETTINGS_LIMITS,
   type ChatMessageView,
+  type Difficulty,
   type HintRounds,
   type Phase,
   type PointReason,
@@ -19,7 +21,7 @@ import {
   type RoundResultView,
   type SecretView,
 } from '../../shared/types';
-import { cleanText, hintRevealsWord, mentionsWord, validateNickname } from '../../shared/text';
+import { cleanText, hintRepeats, hintRevealsWord, mentionsWord, validateNickname } from '../../shared/text';
 import { isOffensive } from '../moderation';
 import {
   AVATAR_COUNT,
@@ -278,9 +280,10 @@ export class GameRoom {
     if (LINK_RE.test(clean)) return fail('ممنوع الروابط في الدردشة 🔗');
     if (isOffensive(clean)) return fail('الرسالة فيها كلمة غير لائقة 🙏');
     const r = s.round;
-    // Civilians must not leak the word. The liar is never checked, so a rejection can't
-    // tell them they guessed right.
-    if (r && this.isActivePhase() && r.participants.includes(byId) && byId !== r.liarId && mentionsWord(clean, r.word)) {
+    // Players must not leak their word. The liar is only ever checked against the word
+    // they were actually shown (expert decoy), so a rejection can never hint at the real one.
+    const own = r && this.isActivePhase() && r.participants.includes(byId) ? this.wordShownTo(r, byId) : null;
+    if (own && mentionsWord(clean, own)) {
       return fail('لا تكتب الكلمة السرية في الدردشة 😅');
     }
     const chat = (s.chat ??= []);
@@ -345,6 +348,9 @@ export class GameRoom {
       next.voteSeconds = patch.voteSeconds;
     }
     if (typeof patch.liarSeesCategory === 'boolean') next.liarSeesCategory = patch.liarSeesCategory;
+    if (patch.difficulty !== undefined && (SETTINGS_LIMITS.difficulty as readonly string[]).includes(patch.difficulty)) {
+      next.difficulty = patch.difficulty;
+    }
     s.settings = next;
     this.emit({ type: 'settings_changed' });
     this.touch();
@@ -400,6 +406,12 @@ export class GameRoom {
     }
     if (!pick) return fail('ما فيه كلمات في التصنيفات المختارة');
 
+    const difficulty: Difficulty = s.settings.difficulty ?? 'normal';
+    let decoyWord: string | null = null;
+    if (difficulty === 'expert') {
+      decoyWord = catalog.guessOptions(pick.packId, pick.word, 2, rng).find((w) => w !== pick!.word) ?? null;
+    }
+
     const participants = online.map((p) => p.id);
     const liarId = weightedPick(participants, (id) => (id === s.lastLiarId ? 0.4 : 1), rng);
     let order = shuffle(participants, rng);
@@ -418,6 +430,8 @@ export class GameRoom {
       category: pick.category,
       wordId: pick.wordId,
       word: pick.word,
+      difficulty,
+      decoyWord,
       liarId,
       liarName: this.getPlayer(liarId)?.nickname ?? '',
       participants,
@@ -465,8 +479,15 @@ export class GameRoom {
     const clean = cleanText(text, HINT_MAX);
     if (!clean) return fail('اكتب تلميح أول');
     if (isOffensive(clean)) return fail('التلميح فيه كلمة غير لائقة 🙏 جرّب غيره');
-    if (byId !== r.liarId && hintRevealsWord(clean, r.word)) {
+    if ((r.difficulty ?? 'normal') !== 'normal' && /\s/.test(clean)) {
+      return fail('في هذا المستوى التلميح كلمة وحدة بس ☝️');
+    }
+    const own = this.wordShownTo(r, byId);
+    if (own && hintRevealsWord(clean, own)) {
       return fail('لا تكتب الكلمة نفسها 😅 جرّب تلميح ثاني');
+    }
+    if (hintRepeats(clean, r.hints.flatMap((h) => (h.text ? [h.text] : [])))) {
+      return fail('هذا التلميح انقال قبل 🔁 جيب كلمة جديدة');
     }
     this.recordHint(slot, clean, now);
     return OK;
@@ -557,7 +578,13 @@ export class GameRoom {
     const leaders = tally.filter((t) => t.votes === max && max > 0);
     r.caught = leaders.length === 1 && leaders[0]!.playerId === r.liarId;
     if (r.caught) {
-      r.guessOptions = this.deps.catalog.guessOptions(r.packId, r.word, GUESS_OPTIONS, this.deps.rng);
+      const count = (r.difficulty ?? 'normal') === 'normal' ? GUESS_OPTIONS : GUESS_OPTIONS_HARD;
+      // The liar's own decoy word is never offered: it would be an obvious wrong answer.
+      const options = this.deps.catalog
+        .guessOptions(r.packId, r.word, count + 1, this.deps.rng)
+        .filter((w) => w !== r.decoyWord);
+      while (options.length > count) options.splice(options.findIndex((w) => w !== r.word), 1);
+      r.guessOptions = options;
       this.state.phase = 'guess';
       this.setDeadline(now + GUESS_MS, now);
     } else {
@@ -606,6 +633,8 @@ export class GameRoom {
       liarId: r.liarId,
       liarName: r.liarName,
       word: r.word,
+      decoyWord: r.decoyWord ?? null,
+      difficulty: r.difficulty ?? 'normal',
       category: r.category,
       caught: reason === 'normal' ? !!r.caught : false,
       votes: Object.entries(r.votes).map(([voterId, targetId]) => ({
@@ -767,8 +796,14 @@ export class GameRoom {
     let secret: SecretView | null = null;
     if (roundVisible) {
       if (!inRound(playerId)) secret = { role: 'spectator' };
-      else if (playerId === r!.liarId) secret = { role: 'liar', category: s.settings.liarSeesCategory ? r!.category : null };
-      else secret = { role: 'civilian', word: r!.word, category: r!.category };
+      else if (playerId !== r!.liarId) secret = { role: 'civilian', word: r!.word, category: r!.category };
+      else if (r!.difficulty === 'expert' && r!.decoyWord && s.phase !== 'results' && s.phase !== 'guess') {
+        // Expert: the liar's card looks exactly like everyone else's, just with another word.
+        secret = { role: 'civilian', word: r!.decoyWord, category: r!.category };
+      } else {
+        const showCategory = (r!.difficulty ?? 'normal') === 'normal' && s.settings.liarSeesCategory;
+        secret = { role: 'liar', category: showCategory ? r!.category : null };
+      }
     }
 
     const slot = r && s.phase === 'hints' ? r.turnQueue[r.turnIndex] : undefined;
@@ -823,6 +858,12 @@ export class GameRoom {
   }
 
   // ---------------------------------------------------------------- helpers
+
+  /** The secret word this participant was shown (null for a normal/hard liar). */
+  private wordShownTo(r: RoundState, playerId: string): string | null {
+    if (playerId !== r.liarId) return r.word;
+    return r.difficulty === 'expert' ? (r.decoyWord ?? null) : null;
+  }
 
   private isHost(id: string): boolean {
     return this.state.hostId === id && !!this.getPlayer(id);

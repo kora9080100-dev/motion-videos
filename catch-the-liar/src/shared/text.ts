@@ -112,3 +112,40 @@ export function mentionsWord(text: string, word: string): boolean {
   }
   return false;
 }
+
+const STOPWORDS = new Set(
+  ['في', 'من', 'على', 'عن', 'مع', 'الى', 'إلى', 'او', 'أو', 'ثم', 'ما', 'لا', 'هو', 'هي', 'شي', 'شيء', 'حق', 'يا', 'اللي', 'ذا', 'هذا', 'هذي', 'كل', 'بس'].map(
+    normalizeForCompare,
+  ),
+);
+
+/** Comparable core of a word: normalised, with common prefixes (ال، و، ب…) removed. */
+export function canonicalWord(token: string): string {
+  let t = normalizeForCompare(token);
+  for (const p of ['وال', 'بال', 'فال', 'كال', 'لل', 'ال']) {
+    if (t.startsWith(p) && t.length - p.length >= 2) {
+      t = t.slice(p.length);
+      break;
+    }
+  }
+  if (t.length >= 4 && 'وب'.includes(t[0]!)) t = t.slice(1);
+  return t;
+}
+
+function significantWords(text: string): string[] {
+  return text
+    .split(/\s+/)
+    .map(canonicalWord)
+    .filter((w) => w && !STOPWORDS.has(w));
+}
+
+/**
+ * True when a hint brings no new word compared with hints already given this round
+ * ("رز" after "رز ولحم", "الرز" after "رز"). Every hint must add at least one new word.
+ */
+export function hintRepeats(hint: string, previous: readonly string[]): boolean {
+  const words = significantWords(hint);
+  if (words.length === 0) return false;
+  const used = new Set(previous.flatMap(significantWords));
+  return words.every((w) => used.has(w));
+}

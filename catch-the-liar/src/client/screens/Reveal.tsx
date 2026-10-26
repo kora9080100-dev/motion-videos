@@ -87,7 +87,11 @@ export function Reveal({ view }: { view: RoomView }) {
               <span className="badge">
                 {secret.category.emoji} {secret.category.name}
               </span>
-              <p className="small dim">واحد منكم ما يعرفها… لمّح لها بذكاء بدون ما تفضحها!</p>
+              <p className="small dim">
+                {view.settings.difficulty === 'expert'
+                  ? 'انتبه: واحد منكم عنده كلمة ثانية وما يدري إنه الكذّاب… يمكن تكون أنت؟! 😏'
+                  : 'واحد منكم ما يعرفها… لمّح لها بذكاء بدون ما تفضحها!'}
+              </p>
             </div>
           )}
         </div>

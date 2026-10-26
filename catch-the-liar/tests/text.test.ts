@@ -53,3 +53,16 @@ describe('mentionsWord (chat)', () => {
     expect(mentionsWord('هههه', 'كبسة')).toBe(false);
   });
 });
+
+describe('hintRepeats', () => {
+  it('flags hints that add no new word', async () => {
+    const { hintRepeats } = await import('../src/shared/text');
+    expect(hintRepeats('رز', ['رز ولحم'])).toBe(true);
+    expect(hintRepeats('الرز', ['رز'])).toBe(true);
+    expect(hintRepeats('ولحم', ['لحم'])).toBe(true);
+    expect(hintRepeats('لحم رز', ['رز ولحم'])).toBe(true);
+    expect(hintRepeats('رز بخاري', ['رز ولحم'])).toBe(false);
+    expect(hintRepeats('بحر', ['حر'])).toBe(false);
+    expect(hintRepeats('مطعم', [])).toBe(false);
+  });
+});
