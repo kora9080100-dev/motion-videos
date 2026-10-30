@@ -12,8 +12,14 @@ import {
 
 // Three stacked 16:9-ish strips like the reference, split by thin black lines.
 const W = 1080;
+const H = 1920;
 const GAP = 6;
-const PANEL_H = 636;
+const PANEL_H = (H - GAP * 2) / 3;
+
+// The pour shots are framed tall, so their page uses a 2x2 grid of portrait cells
+// that shows each clip whole instead of cropping it into a strip.
+const CELL_W = (W - GAP) / 2;
+const CELL_H = (H - GAP) / 2;
 
 // Source clips are 464x832 portrait (top-down ones get rotated to landscape).
 const SRC_ASPECT = 464 / 832;
@@ -26,13 +32,18 @@ type Shot = {
 	focus?: number;
 	// Rotate top-down portrait clips so they fill the strip without cropping.
 	rotate?: 90 | -90;
+	// Slow a clip down to stay on the best part of the take.
+	rate?: number;
 };
 
-type Page = {frames: number; shots: [Shot, Shot, Shot]};
+type Page =
+	| {frames: number; layout: 'strips'; shots: [Shot, Shot, Shot]}
+	| {frames: number; layout: 'grid'; shots: [Shot, Shot, Shot, Shot]};
 
 const PAGES: Page[] = [
 	{
 		frames: 87,
+		layout: 'strips',
 		shots: [
 			{src: 'clips/tin-slide.mp4', from: 0.55, rotate: -90},
 			{src: 'clips/counter.mp4', from: 0, focus: 0.15},
@@ -41,18 +52,21 @@ const PAGES: Page[] = [
 	},
 	{
 		frames: 96,
+		layout: 'strips',
 		shots: [
 			{src: 'clips/tin-spoon.mp4', from: 1.6, rotate: 90},
 			{src: 'clips/counter.mp4', from: 2.9, focus: 0.92},
-			{src: 'clips/mural.mp4', from: 0.5, focus: 0.66},
+			{src: 'clips/window.mp4', from: 0.8, focus: 0.67},
 		],
 	},
 	{
 		frames: 87,
+		layout: 'grid',
 		shots: [
-			{src: 'clips/pour-cup.mp4', from: 0.8, focus: 1},
-			{src: 'clips/pour-hand.mp4', from: 0.6, focus: 0.42},
-			{src: 'clips/v60.mp4', from: 1.0, focus: 0.4},
+			{src: 'clips/pour-cup.mp4', from: 0.8},
+			{src: 'clips/pour-hand.mp4', from: 0, rate: 0.8},
+			{src: 'clips/v60.mp4', from: 1.0},
+			{src: 'clips/mural.mp4', from: 0.5},
 		],
 	},
 ];
@@ -62,10 +76,16 @@ export const TOTAL_FRAMES = PAGES.reduce((sum, p) => sum + p.frames, 0);
 // Warm golden grade to match the reference's sunlit orange look.
 const GRADE = 'sepia(0.3) saturate(1.65) contrast(1.12) brightness(0.97)';
 
-const Panel: React.FC<{shot: Shot; frames: number}> = ({shot, frames}) => {
+const Panel: React.FC<{
+	shot: Shot;
+	frames: number;
+	width: number;
+	height: number;
+	zoom: [number, number];
+}> = ({shot, frames, width, height, zoom}) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
-	const push = interpolate(frame, [0, frames], [1.02, 1.08]);
+	const push = interpolate(frame, [0, frames], zoom);
 
 	const videoStyle: React.CSSProperties = {
 		width: '100%',
@@ -79,20 +99,21 @@ const Panel: React.FC<{shot: Shot; frames: number}> = ({shot, frames}) => {
 		<OffthreadVideo
 			src={staticFile(shot.src)}
 			trimBefore={Math.round(shot.from * fps)}
+			playbackRate={shot.rate ?? 1}
 			muted
 			style={videoStyle}
 		/>
 	);
 
-	const innerW = PANEL_H;
-	const innerH = Math.ceil(PANEL_H / SRC_ASPECT);
+	const innerW = height;
+	const innerH = Math.ceil(height / SRC_ASPECT);
 
 	return (
 		<div
 			style={{
 				position: 'relative',
-				width: W,
-				height: PANEL_H,
+				width,
+				height,
 				overflow: 'hidden',
 				background: '#000',
 			}}
@@ -104,8 +125,8 @@ const Panel: React.FC<{shot: Shot; frames: number}> = ({shot, frames}) => {
 							position: 'absolute',
 							width: innerW,
 							height: innerH,
-							left: (W - innerW) / 2,
-							top: (PANEL_H - innerH) / 2,
+							left: (width - innerW) / 2,
+							top: (height - innerH) / 2,
 							transform: `rotate(${shot.rotate}deg)`,
 						}}
 					>
@@ -161,13 +182,26 @@ export const EraDrip: React.FC = () => {
 			{PAGES.map((page) => {
 				const from = start;
 				start += page.frames;
+				const isGrid = page.layout === 'grid';
 				return (
 					<Sequence key={from} from={from} durationInFrames={page.frames}>
 						<AbsoluteFill
-							style={{flexDirection: 'column', justifyContent: 'space-between'}}
+							style={{
+								flexDirection: isGrid ? 'row' : 'column',
+								flexWrap: 'wrap',
+								alignContent: 'space-between',
+								justifyContent: 'space-between',
+							}}
 						>
 							{page.shots.map((shot) => (
-								<Panel key={shot.src} shot={shot} frames={page.frames} />
+								<Panel
+									key={shot.src}
+									shot={shot}
+									frames={page.frames}
+									width={isGrid ? CELL_W : W}
+									height={isGrid ? CELL_H : PANEL_H}
+									zoom={isGrid ? [1, 1.03] : [1.02, 1.08]}
+								/>
 							))}
 						</AbsoluteFill>
 					</Sequence>
